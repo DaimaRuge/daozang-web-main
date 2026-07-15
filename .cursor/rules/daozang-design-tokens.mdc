@@ -1,0 +1,20 @@
+---
+description: 视觉设计规范：东方美学设计令牌与交互风格
+globs: **/*.css,**/*.tsx
+alwaysApply: false
+---
+
+# 视觉风格
+
+- 基调：极简、清静、留白、现代东方、长时间阅读友好。避免高饱和度色彩、大面积仿古纹理、龙纹八卦祥云等装饰滥用。
+- 色彩体系（唯一取色入口是 `app/globals.css` 的 `@theme` 令牌，禁止页面硬编码色值）：
+  - 宣纸白 `--bg` 背景 / 墨黑 `--text` 正文 / 水墨灰 `--muted` 辅助
+  - 松绿 `--accent` 主色（链接、导航高亮）
+  - 朱砂 `--cinnabar` 强调色，克制使用（关键动作、AI 标注）
+- 字体：正文用 `--font-serif-cn`（Noto Serif SC + 系统回退），UI 辅助信息可用 `--font-sans-cn`，必须有系统回退栈。
+
+# 交互风格
+
+- 克制、流畅、非打扰式：主动提示必须可关闭、不自动跳转（参考阅读器「继续阅读」条的实现）。
+- 动效使用 `--duration-fast/base` 令牌，尊重 `prefers-reduced-motion`。
+- 阅读主题（宣纸/护眼/夜间）通过 `data-reader-theme` 属性切换 CSS 变量，不新增平行色彩体系。

@@ -1,0 +1,8 @@
+data/daozang-text/
+data/daozang-text-new/
+data/daozang-text-utf8/
+data/daozang-text-orig/
+node_modules/
+.vercel
+.git
+test_download.txt

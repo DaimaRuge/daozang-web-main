@@ -1,0 +1,21 @@
+# dependencies
+node_modules/
+/.next/
+/out/
+
+# data - cloned at build time
+data/daozang-text/
+data/index.json
+
+# misc
+.DS_Store
+*.pem
+.env
+.env*.local
+.vercel
+npm-debug.log*
+
+# libtv / 生成脚本中间产物
+.libtv/
+scripts/out-*.json
+test_download.txt

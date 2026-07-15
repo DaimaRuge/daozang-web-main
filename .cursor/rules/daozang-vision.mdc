@@ -1,0 +1,18 @@
+---
+description: 道藏文化平台的核心定位与架构理念
+alwaysApply: true
+---
+
+# 项目核心定位
+
+- 本项目是公益性、非营利的「道藏文化」数字阅读与传播平台（品牌：道可道），未来扩展至 Android/iOS App 与 PWA，前端设计需考虑 React Native/Flutter 兼容。
+- 核心架构理念是 **Web as Agent**：网站不只是内容展示，而是用户的私人修道/阅读助理。Agent 需理解用户正在读什么、读到哪里、选中了什么（见 `lib/agent/context.ts` 的 AgentContext 契约）。
+- 技术基线：Next.js App Router + React + TypeScript + Tailwind CSS 4，无 UI 组件库、无状态管理库、静态 JSON 数据（`public/data/`）。除非有明确必要，不引入新框架。
+
+# 内容三层边界（不可违反）
+
+1. 原始文本（`public/data/content/*.json`）：不可变底稿，任何代码不得改写。
+2. 结构化文本（`lib/text-parser.ts` 产出）：仅做层级/格式处理，带行号溯源与置信度。
+3. AI 增强内容：摘要、解释、翻译等，必须显式标注为 AI 生成，绝不与原文混排或伪装成典籍内容。
+
+低置信度识别结果标记待审核，不得静默改写；AI 回答需带引用来源（Citation）。

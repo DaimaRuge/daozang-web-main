@@ -1,0 +1,20 @@
+---
+description: 组件架构规范：复用性、AI 插槽预留与结构化渲染
+globs: **/*.tsx,**/*.ts
+alwaysApply: false
+---
+
+# 组件架构原则
+
+- 业务逻辑不写在页面组件里：数据访问走 `lib/data.ts`，用户数据走 `lib/user-data.ts`，Agent 相关走 `lib/agent/*`。类型定义从 `lib/content-schema.ts`、`lib/data.ts` 导入，禁止在页面里重复定义接口。
+- 组件按「单一插槽职责」拆分（参考 `components/reader/`）：
+  - `BlockRenderer` 是结构化文本到视觉的唯一转换点，新增内容块类型只改它；
+  - `SelectionToolbar` 是划词能力（收藏/笔记/AI 解释）的公共入口，动作由父组件注入回调；
+  - 编排组件（如 `Reader`）只管状态与持久化，不直接写渲染细节。
+- 为 AI 功能预留插槽：AI 未接入时相关按钮呈禁用态（诚实预告），不隐藏也不伪装可用；AI 回调统一走 `/api/agent` 与 `lib/agent/tools.ts` 的工具注册表，模型不得直接访问数据。
+
+# 结构化渲染要求
+
+- 前端渲染必须基于 ContentBlock（标题/摘要/段落/诗偈/注文分离），不允许把整篇文本当作一个字符串 split 后直接铺 `<p>`。
+- 每个内容块渲染时保留 `id` 与 `data-block-id`，保证目录定位、收藏、笔记、Agent 溯源可用。
+- 服务端组件负责取数与解析（SEO 正文可读），客户端组件只负责交互。

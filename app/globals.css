@@ -1,0 +1,227 @@
+@import "tailwindcss";
+
+/* ============================================================
+   设计令牌（Design Tokens）
+   风格基调：清静、留白、现代东方、长时间阅读友好。
+   色彩策略：宣纸白背景 + 墨色文字 + 松绿主色 + 少量朱砂强调，
+   避免高饱和度色彩与大面积仿古纹理。
+   注意：--bg/--text/--accent 等旧变量名保持不变，
+   既是兼容既有页面，也是全站唯一的取色入口（禁止页面内硬编码色值）。
+   ============================================================ */
+@theme {
+  /* ---- 色彩 ---- */
+  --bg: #f7f4ec;             /* 宣纸白：主背景 */
+  --text: #2b2926;           /* 墨黑：正文 */
+  --text-secondary: #57534a; /* 次级文字 */
+  --muted: #8c867a;          /* 水墨灰：辅助信息 */
+  --accent: #4a6b5d;         /* 松绿：主色（链接、导航高亮） */
+  --accent-light: #6f8f80;   /* 松绿浅调 */
+  --cinnabar: #a83f39;       /* 朱砂：强调色，克制使用（关键按钮、印章式点缀） */
+  --border: #e6e0d2;         /* 分隔线 */
+  --card: #fdfbf5;           /* 卡片底色 */
+  --card-hover: #f1ede2;     /* 卡片悬停 */
+  --highlight: #ead9b0;      /* 选中/高亮底色 */
+  --review: #c2884e;         /* 低置信度「待审核」标记色 */
+
+  /* ---- 字体 ---- */
+  --font-serif-cn: "Noto Serif SC", "Source Han Serif SC", "Songti SC", "SimSun", serif;
+  --font-sans-cn: -apple-system, "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
+  --font-mono: ui-monospace, "SFMono-Regular", Consolas, monospace;
+
+  /* ---- 排版与布局 ---- */
+  --content-width: 42rem;      /* 正文阅读最佳行宽 */
+  --content-width-wide: 52rem;
+  --content-width-narrow: 36rem;
+  --radius: 0.5rem;
+  --shadow-soft: 0 1px 3px rgba(43, 41, 38, 0.06), 0 4px 16px rgba(43, 41, 38, 0.04);
+
+  /* ---- 动效：克制、非打扰 ---- */
+  --duration-fast: 150ms;
+  --duration-base: 300ms;
+}
+
+body {
+  font-family: var(--font-serif-cn);
+  background-color: var(--bg);
+  /* 极淡的纸纹噪点：营造纸感但不干扰阅读 */
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence baseFrequency='0.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.03'/%3E%3C/svg%3E");
+  color: var(--text);
+  line-height: 1.8;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ============================================================
+   阅读主题（仅作用于阅读器容器，通过 data-reader-theme 切换）。
+   为什么不做全站换肤：阅读页是长时间停留场景，夜间/护眼需求最强，
+   先在阅读器内落地，后续再评估全站深色模式。
+   ============================================================ */
+[data-reader-theme='sepia'] {
+  --bg: #f5ecd9;
+  --card: #faf3e3;
+  --border: #e3d6bb;
+  --text: #4a3f2e;
+  --muted: #93866c;
+}
+
+[data-reader-theme='night'] {
+  --bg: #1c1b18;
+  --card: #26241f;
+  --card-hover: #2e2b25;
+  --border: #3a362e;
+  --text: #d3cec2;
+  --text-secondary: #a8a294;
+  --muted: #7d7869;
+  --accent: #7fa392;
+  --highlight: #4a4432;
+}
+
+/* 夜间模式去掉纸纹噪点（主题属性挂在 html 上，让导航/页脚一并换色） */
+[data-reader-theme='night'] body {
+  background-image: none;
+}
+
+/* ============================================================
+   结构化正文排版：按 ContentBlock 类型分层，
+   替代旧的 .text-content 通篇 <p> 样式。
+   ============================================================ */
+.reading-area {
+  /* 字号/行高由阅读器设置注入 CSS 变量，避免逐块内联样式 */
+  font-size: var(--reader-font-size, 1.125rem);
+  line-height: var(--reader-line-height, 2);
+}
+
+.reading-area .block-paragraph {
+  text-indent: 2em;
+  margin-bottom: 0.9em;
+  /* CJK 断行与标点悬挂：长文阅读的排版细节 */
+  text-align: justify;
+  hanging-punctuation: allow-end;
+}
+
+.reading-area .block-heading-1 {
+  font-size: 1.5em;
+  font-weight: 600;
+  text-align: center;
+  letter-spacing: 0.15em;
+  margin: 1.2em 0 1em;
+}
+
+.reading-area .block-heading-2 {
+  font-size: 1.25em;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  margin: 2em 0 1em;
+}
+
+.reading-area .block-subheading {
+  font-size: 1.1em;
+  font-weight: 600;
+  margin: 1.6em 0 0.8em;
+}
+
+/* 正文内小节标签（呪曰/頌曰等）：弱于章节标题的引导语 */
+.reading-area .block-say-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 1em 0 0.5em;
+}
+
+.reading-area .block-verse {
+  text-align: center;
+  white-space: pre-line;
+  margin: 1.2em 0;
+  color: var(--text-secondary);
+}
+
+.reading-area .block-quote {
+  border-left: 2px solid var(--accent-light);
+  padding-left: 1em;
+  margin: 1em 0;
+  color: var(--text-secondary);
+}
+
+/* 整理者按语：视觉上明确区别于经文原文（内容边界原则） */
+.reading-area .block-editor-note {
+  font-size: 0.85em;
+  font-family: var(--font-sans-cn);
+  color: var(--muted);
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.7em 1em;
+  margin: 1em 0;
+}
+
+.reading-area .block-annotation {
+  font-size: 0.9em;
+  color: var(--muted);
+}
+
+/* 低置信度块：淡色下划线提示「结构待审核」，不打扰正常阅读 */
+.reading-area .block-low-confidence {
+  border-bottom: 1px dashed var(--review);
+}
+
+/* 书内搜索定位闪烁：短暂标示目标块 */
+.reading-area .block-flash {
+  background: var(--highlight);
+  border-radius: var(--radius);
+  transition: background var(--duration-base) ease-out;
+}
+
+.reading-area .block-separator {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 2em auto;
+  width: 30%;
+}
+
+.reading-area .block-image-caption {
+  text-align: center;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin: -1em 0 1.5em;
+  line-height: 1.6;
+}
+
+/* 目录横滑条隐藏滚动条 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+/* 兼容旧样式：about 等页面仍在使用 */
+.text-content p { text-indent: 2em; margin-bottom: 0.8em; }
+.text-content h1, .text-content h2, .text-content h3 { font-weight: 600; margin: 1.5em 0 0.8em; text-indent: 0; }
+.text-content h1 { font-size: 1.5rem; }
+.text-content h2 { font-size: 1.25rem; }
+.text-content h3 { font-size: 1.1rem; }
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+/* Animations —— 尊重系统减弱动效设置 */
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn var(--duration-base) ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-in { animation: none; }
+  * { transition-duration: 0.01ms !important; }
+}
+
+/* 键盘导航可见焦点（无障碍） */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
