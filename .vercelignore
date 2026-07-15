@@ -2,6 +2,8 @@ data/daozang-text/
 data/daozang-text-new/
 data/daozang-text-utf8/
 data/daozang-text-orig/
+data/content.json
+data/index.json
 node_modules/
 .vercel
 .git

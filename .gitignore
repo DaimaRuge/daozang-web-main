@@ -5,7 +5,11 @@ node_modules/
 
 # data - cloned at build time
 data/daozang-text/
+data/daozang-text-new/
+data/daozang-text-utf8/
+data/daozang-text-orig/
 data/index.json
+data/content.json
 
 # misc
 .DS_Store
@@ -19,3 +23,5 @@ npm-debug.log*
 .libtv/
 scripts/out-*.json
 test_download.txt
+
+.vercel
