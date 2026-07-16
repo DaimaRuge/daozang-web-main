@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import MusicPlayer from '@/app/music/MusicPlayer';
-import { BAGUA_TRACKS, MUSIC_THEMES, MusicTheme, WUXING_TRACKS } from '@/lib/music-catalog';
+import { MUSIC_THEMES, MusicTheme, THEME_INTRO, TRACKS_BY_THEME } from '@/lib/music-catalog';
 
-/** 道乐主题切换：五行 / 八卦，各主题独立播放器状态 */
+/** 道乐主题切换：五行 / 八卦 / 天干 / 时辰 / 节气 */
 export default function MusicThemes() {
   const [theme, setTheme] = useState<MusicTheme>('wuxing');
-  const tracks = theme === 'wuxing' ? WUXING_TRACKS : BAGUA_TRACKS;
+  const tracks = TRACKS_BY_THEME[theme];
 
   return (
     <div>
@@ -17,22 +17,20 @@ export default function MusicThemes() {
             key={t.id}
             type="button"
             onClick={() => setTheme(t.id)}
-            className={`px-4 py-2 text-sm rounded-lg border transition-colors ${
+            className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
               theme === t.id
                 ? 'border-[var(--accent)] bg-[var(--accent)]/10 text-[var(--accent)]'
-                : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]'
+                : 'border-[var(--border)] text-[var(--text-secondary)] hover:text-[var(--text)] hover:border-[var(--accent-light)]'
             }`}
           >
-            {t.label}
-            <span className="ml-2 text-xs opacity-60">{t.desc}</span>
+            <span className="font-medium">{t.label}</span>
+            <span className="ml-1.5 text-xs opacity-70">{t.desc}</span>
           </button>
         ))}
       </div>
 
-      <p className="text-sm text-[var(--muted)] leading-relaxed mb-6 max-w-2xl">
-        {theme === 'wuxing'
-          ? '五行对应五音（宫商角徵羽），是道教乐理的基本框架。以下器乐依五行意象生成，适合阅读时作背景氛围。'
-          : '八卦取象天地雷风水火山泽，各卦有独特气韵。以下器乐依八卦意象生成，可随阅读内容切换心境。'}
+      <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-6 max-w-2xl">
+        {THEME_INTRO[theme]}
       </p>
 
       <MusicPlayer key={theme} tracks={tracks} />

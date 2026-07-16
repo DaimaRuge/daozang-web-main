@@ -4,8 +4,8 @@ import Link from 'next/link';
 import MusicThemes from './MusicThemes';
 
 export const metadata: Metadata = {
-  title: '道乐 · 五行八卦音律',
-  description: '以五行、八卦为主题的道教风格背景音乐，与《道德经》经文聆听。适合阅读道藏典籍时作背景氛围。',
+  title: '道乐 · 音律殿堂',
+  description: '五行、八卦、十天干、十二时辰、二十四节气为主题的道教风格背景音乐，与《道德经》经文聆听。适合阅读道藏典籍时作背景氛围。',
 };
 
 const DAODEJING_1 =
@@ -20,7 +20,7 @@ export default function MusicPage() {
         <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent flex items-end">
           <div className="p-6 text-white">
             <h1 className="text-2xl md:text-3xl font-serif tracking-widest mb-1">道乐 · 音律殿堂</h1>
-            <p className="text-xs md:text-sm opacity-85">大音希声 —— 五行五音、八卦八象，为阅读铺陈背景</p>
+            <p className="text-xs md:text-sm opacity-90">大音希声 —— 五行 · 八卦 · 天干 · 时辰 · 节气</p>
           </div>
         </div>
       </div>

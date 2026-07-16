@@ -19,6 +19,11 @@ foreach ($t in $tracks) {
     if (Test-Path $out) { Write-Host "[skip] $out"; continue }
     Write-Host "[gen] $($t.file) ..."
     mmx music generate --prompt $t.prompt --instrumental --genre "Chinese Taoist meditation" --instruments $t.instruments --tempo slow --avoid "vocals, electronic" --timeout 280 --out $out --quiet --non-interactive
+    if ($LASTEXITCODE -ne 0 -and (Test-Path $out)) { Remove-Item $out -Force -ErrorAction SilentlyContinue }
+    if ($LASTEXITCODE -ne 0) {
+        Start-Sleep -Seconds 35
+        mmx music generate --prompt $t.prompt --instrumental --genre "Chinese Taoist meditation" --instruments $t.instruments --tempo slow --avoid "vocals, electronic" --timeout 280 --out $out --quiet --non-interactive
+    }
     if ($LASTEXITCODE -ne 0) { Write-Host "[fail] $($t.file) exit=$LASTEXITCODE" }
     else { Write-Host "[done] $out" }
     Start-Sleep -Seconds 25
