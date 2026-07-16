@@ -15,6 +15,7 @@ import {
 } from '@/lib/user-data';
 import { useLocalData, useReaderSettings } from '@/lib/use-local-data';
 import { ReadingContext } from '@/lib/agent/context';
+import { buildFootnoteIndex } from '@/lib/footnotes';
 import BlockRenderer from './BlockRenderer';
 import TocPanel from './TocPanel';
 import SettingsPanel from './SettingsPanel';
@@ -101,6 +102,35 @@ export default function Reader({
   next: AdjacentLink;
 }) {
   const router = useRouter();
+
+  /** 底本校勘 #N 索引：按卷域关联正文引用与校勘条目 */
+  const footnoteIndex = useMemo(() => buildFootnoteIndex(parsed.blocks), [parsed.blocks]);
+
+  /** 脚注/目录/书内搜索共用的块定位：平滑滚动 + 短暂高亮 + 更新 URL 锚点 */
+  const navigateToBlock = useCallback((blockId: string) => {
+    window.history.replaceState(null, '', `#${blockId}`);
+    const scrollTo = () => {
+      const el = document.getElementById(blockId);
+      if (!el) return false;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('block-flash');
+      setTimeout(() => el.classList.remove('block-flash'), 1600);
+      return true;
+    };
+    if (!scrollTo()) {
+      // 极少数情况下块尚未挂载，下一帧重试
+      requestAnimationFrame(() => scrollTo());
+    }
+  }, []);
+
+  /** 支持带 hash 打开阅读页时自动定位（如分享脚注链接） */
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const timer = window.setTimeout(() => navigateToBlock(hash), 300);
+    return () => window.clearTimeout(timer);
+  }, [entry.id, navigateToBlock]);
+
   // ---- 阅读设置：水合安全的共享 store，本地持久化 ----
   const [settings, updateSettings] = useReaderSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -403,7 +433,7 @@ export default function Reader({
       <div className="flex gap-8">
         <aside className="hidden lg:block w-44 shrink-0">
           <div className="sticky top-8 max-h-[85vh] overflow-y-auto pr-2">
-            <InBookSearch blocks={parsed.blocks} />
+            <InBookSearch blocks={parsed.blocks} onNavigateToBlock={navigateToBlock} />
             {parsed.toc.length > 1 && (
               <>
                 <p className="text-xs text-[var(--muted)] mb-2 tracking-wider">目 录</p>
@@ -434,7 +464,12 @@ export default function Reader({
               } as React.CSSProperties
             }
           >
-            <BlockRenderer blocks={parsed.blocks} showEditorNotes={settings.showEditorNotes} />
+            <BlockRenderer
+              blocks={parsed.blocks}
+              showEditorNotes={settings.showEditorNotes}
+              footnoteIndex={footnoteIndex}
+              onFootnoteNavigate={navigateToBlock}
+            />
           </article>
 
           {selection && (
@@ -485,7 +520,11 @@ export default function Reader({
             className="absolute bottom-0 left-0 right-0 max-h-[60vh] overflow-y-auto bg-[var(--card)] rounded-t-xl p-5 animate-fade-in"
             onClick={e => e.stopPropagation()}
           >
-            <InBookSearch blocks={parsed.blocks} onNavigate={() => setTocOpen(false)} />
+            <InBookSearch
+              blocks={parsed.blocks}
+              onNavigate={() => setTocOpen(false)}
+              onNavigateToBlock={navigateToBlock}
+            />
             <p className="text-xs text-[var(--muted)] mb-3 tracking-wider">目 录</p>
             <TocPanel toc={parsed.toc} activeId={activeTocId} onNavigate={() => setTocOpen(false)} />
           </div>

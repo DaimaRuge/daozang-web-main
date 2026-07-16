@@ -14,10 +14,13 @@ import { trackEvent } from '@/lib/user-data';
 export default function InBookSearch({
   blocks,
   onNavigate,
+  onNavigateToBlock,
 }: {
   blocks: ContentBlock[];
   /** 定位后回调（移动端用于收起抽屉） */
   onNavigate?: () => void;
+  /** 与脚注跳转共用的高亮定位逻辑 */
+  onNavigateToBlock?: (blockId: string) => void;
 }) {
   const [query, setQuery] = useState('');
 
@@ -40,12 +43,15 @@ export default function InBookSearch({
   }, [blocks, query]);
 
   const locate = (blockId: string) => {
-    const el = document.getElementById(blockId);
-    if (!el) return;
-    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    // 定位后短暂高亮目标块，帮助视线锁定
-    el.classList.add('block-flash');
-    setTimeout(() => el.classList.remove('block-flash'), 1600);
+    if (onNavigateToBlock) {
+      onNavigateToBlock(blockId);
+    } else {
+      const el = document.getElementById(blockId);
+      if (!el) return;
+      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      el.classList.add('block-flash');
+      setTimeout(() => el.classList.remove('block-flash'), 1600);
+    }
     trackEvent('search', { scope: 'in-book' });
     onNavigate?.();
   };
