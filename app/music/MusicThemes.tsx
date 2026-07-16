@@ -3,10 +3,14 @@
 import { useState } from 'react';
 import MusicPlayer from '@/app/music/MusicPlayer';
 import { MUSIC_THEMES, MusicTheme, THEME_INTRO, TRACKS_BY_THEME } from '@/lib/music-catalog';
+import { getMusicPlayerState } from '@/lib/user-data';
 
 /** 道乐主题切换：五行 / 八卦 / 天干 / 时辰 / 节气 */
 export default function MusicThemes() {
-  const [theme, setTheme] = useState<MusicTheme>('wuxing');
+  const [theme, setTheme] = useState<MusicTheme>(() => {
+    if (typeof window === 'undefined') return 'wuxing';
+    return (getMusicPlayerState().theme as MusicTheme) || 'wuxing';
+  });
   const tracks = TRACKS_BY_THEME[theme];
 
   return (
@@ -33,7 +37,7 @@ export default function MusicThemes() {
         {THEME_INTRO[theme]}
       </p>
 
-      <MusicPlayer key={theme} tracks={tracks} />
+      <MusicPlayer tracks={tracks} theme={theme} />
     </div>
   );
 }

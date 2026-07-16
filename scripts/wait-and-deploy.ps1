@@ -16,8 +16,8 @@ function Log($msg) {
 $expected = @(
     @("wuxing-jin","wuxing-mu","wuxing-shui","wuxing-huo","wuxing-tu") | ForEach-Object { "$_.mp3" }
 ) + @(
-    "bagua-qian","bagua-kun","bagua-zhen","bagua-xun","bagua-kan","bagua-li","bagua-gen","bagua-dui"
-) | ForEach-Object { "$_.mp3" }
+    @("bagua-qian","bagua-kun","bagua-zhen","bagua-xun","bagua-kan","bagua-li","bagua-gen","bagua-dui") | ForEach-Object { "$_.mp3" }
+)
 $expected += @("jia","yi","bing","ding","wu","ji","geng","xin","ren","gui") | ForEach-Object { "tiangan-$_.mp3" }
 $expected += @("zi","chou","yin","mao","chen","si","wu","wei","shen","you","xu","hai") | ForEach-Object { "shichen-$_.mp3" }
 $expected += @(
@@ -76,9 +76,9 @@ $finalMissing = Get-Missing
 $have = $expected.Count - $finalMissing.Count
 Log "final: $have / $($expected.Count) tracks"
 
-# 3. git commit & push（含首页、道乐页、脚本与已生成音频）
+# 3. git commit & push（含首页、道乐页、配图、脚本与已生成音频）
 Log "git add & commit..."
-git add app/page.tsx app/music/ lib/music-catalog.ts scripts/gen-*.ps1 scripts/wait-and-deploy.ps1 public/audio/*.mp3
+git add app/page.tsx app/music/ lib/music-catalog.ts lib/music-image-prompts.ts scripts/gen-*.ps1 scripts/gen-music-images.ts scripts/wait-and-deploy.ps1 public/audio/*.mp3 public/images/music/*.jpg
 
 $status = git status --porcelain
 if (-not $status) {
