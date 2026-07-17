@@ -173,7 +173,7 @@ registerTool({
         : null
       : 'text 必填',
   async execute(input, context) {
-    const provider = getProvider();
+    const provider = getProvider('fast');
     if (!provider.isConfigured()) throw new Error('AI 服务尚未配置');
 
     // 携带阅读上下文中的出处信息，让解释有据可依，也便于回答中引用
@@ -215,7 +215,7 @@ registerTool({
         : null
       : 'text 必填',
   async execute(input, context) {
-    const provider = getProvider();
+    const provider = getProvider('fast');
     if (!provider.isConfigured()) throw new Error('AI 服务尚未配置');
 
     const bookTitle = context.reading?.bookTitle ?? '未知典籍';
@@ -238,6 +238,58 @@ registerTool({
   },
 });
 
+/** 章节/本页摘要：概要 + 关键概念，输出与原文严格分区 */
+const SUMMARY_SYSTEM_PROMPT = [
+  '你是道藏典籍阅读助手，为现代读者生成导读摘要。',
+  '要求：',
+  '1. 先用 3～6 句概括本段大意；',
+  '2. 再列出 3～8 个关键概念/术语（每项一行：「术语 — 一句解释」）；',
+  '3. 严格区分原文所述与你的归纳；不确定处标明「存疑」；',
+  '4. 不得虚构出处或人物言论；简体中文；总长控制在 400 字以内。',
+].join('\n');
+
+registerTool({
+  name: 'generate_summary',
+  description: '生成章节或当前阅读页的 AI 导读摘要（概要 + 概念列表，须标注 AI 生成）',
+  requires: 'canUseAI',
+  validate: input => {
+    if (typeof input.text === 'string' && input.text.trim()) {
+      return input.text.length > 8000 ? '文本过长（上限 8000 字）' : null;
+    }
+    if (typeof input.bookId === 'string' && input.bookId) return null;
+    return 'text 或 bookId 至少提供一个';
+  },
+  async execute(input, context) {
+    const provider = getProvider('pro');
+    if (!provider.isConfigured()) throw new Error('AI 服务尚未配置');
+
+    const bookTitle = context.reading?.bookTitle ?? '未知典籍';
+    let source = typeof input.text === 'string' ? input.text.trim() : '';
+    if (!source && typeof input.bookId === 'string') {
+      const content = getContentById(String(input.bookId));
+      // 无划定文本时取开篇片段，避免整书塞进上下文
+      source = content.slice(0, 3000);
+    }
+    if (!source) throw new Error('无可用原文');
+
+    const reply = await provider.chat(
+      [
+        { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
+        { role: 'user', content: `出处：《${bookTitle}》\n\n原文：\n${source}` },
+      ],
+      { temperature: 0.3, maxTokens: 900 },
+    );
+
+    return {
+      aiGenerated: true,
+      explanation: reply,
+      citations: context.reading?.bookId
+        ? [{ bookId: context.reading.bookId, bookTitle, blockId: context.reading.blockId }]
+        : [],
+    };
+  },
+});
+
 // ---------- 占位工具（接口先行，依赖 AI 供应商或用户系统，分期实现） ----------
 
 const PLANNED_TOOLS: Array<{ name: string; description: string; requires: keyof PermissionContext | null }> = [
@@ -247,7 +299,6 @@ const PLANNED_TOOLS: Array<{ name: string; description: string; requires: keyof 
   { name: 'update_note', description: '更新用户笔记', requires: 'canWriteUserData' },
   { name: 'save_bookmark', description: '为用户保存收藏', requires: 'canWriteUserData' },
   { name: 'create_reading_list', description: '创建阅读清单', requires: 'canWriteUserData' },
-  { name: 'generate_summary', description: '生成章节摘要（AI 生成内容，输出必须标注）', requires: 'canUseAI' },
   { name: 'generate_study_outline', description: '基于用户笔记生成学习提纲', requires: 'canUseAI' },
   { name: 'generate_audio_script', description: '生成有声典籍讲解脚本', requires: 'canUseAI' },
   { name: 'generate_video_script', description: '生成章节导读视频脚本', requires: 'canUseAI' },

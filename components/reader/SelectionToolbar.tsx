@@ -24,6 +24,7 @@ export default function SelectionToolbar({
   onNote,
   onAskAI,
   onTranslate,
+  onIllustrate,
 }: {
   selection: SelectionInfo;
   onCopy: () => void;
@@ -33,6 +34,8 @@ export default function SelectionToolbar({
   onAskAI?: () => void;
   /** AI 现代汉语转写，同上 */
   onTranslate?: () => void;
+  /** AI 生成插图 */
+  onIllustrate?: () => void;
 }) {
   const btn =
     'px-3 py-1.5 text-xs whitespace-nowrap hover:bg-[var(--card-hover)] transition-colors first:rounded-l-lg last:rounded-r-lg';
@@ -49,6 +52,14 @@ export default function SelectionToolbar({
       <button className={btn} onClick={onCopy}>复制</button>
       <button className={`${btn} border-l border-[var(--border)]`} onClick={onBookmark}>收藏</button>
       <button className={`${btn} border-l border-[var(--border)]`} onClick={onNote}>笔记</button>
+      <button
+        className={`${btn} border-l border-[var(--border)] ${onIllustrate ? '' : 'opacity-40 cursor-not-allowed'}`}
+        onClick={onIllustrate}
+        disabled={!onIllustrate}
+        title={onIllustrate ? 'AI 生成插图' : 'AI 插图功能即将上线'}
+      >
+        插图
+      </button>
       <button
         className={`${btn} border-l border-[var(--border)] ${onTranslate ? '' : 'opacity-40 cursor-not-allowed'}`}
         onClick={onTranslate}

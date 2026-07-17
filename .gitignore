@@ -10,6 +10,8 @@ data/daozang-text-utf8/
 data/daozang-text-orig/
 data/index.json
 data/content.json
+data/daozang.db
+data/daozang.db-*
 
 # misc
 .DS_Store
@@ -22,6 +24,11 @@ npm-debug.log*
 # libtv / 生成脚本中间产物
 .libtv/
 scripts/out-*.json
+scripts/*.log
 test_download.txt
+
+# 本地调试产物
+.playwright-mcp/
+tsconfig.tsbuildinfo
 
 .vercel

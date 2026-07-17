@@ -68,6 +68,16 @@ export default function SettingsPanel({
       </div>
 
       <div className={row}>
+        <span className="text-[var(--muted)] text-xs">阅读方式</span>
+        <div className="flex items-center gap-2">
+          {([['paged', '分页'], ['scroll', '滚动']] as const).map(([m, label]) => (
+            <button key={m} className={settings.readingMode === m ? btnActive : btn}
+              onClick={() => set('readingMode', m)}>{label}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className={row}>
         <span className="text-[var(--muted)] text-xs">整理者按语</span>
         <button className={settings.showEditorNotes ? btnActive : btn}
           onClick={() => set('showEditorNotes', !settings.showEditorNotes)}>

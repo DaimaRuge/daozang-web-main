@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { AgentMessage, Citation, ReadingContext, createDefaultContext } from '@/lib/agent/context';
 import { consumeAskContext } from '@/lib/ask-context';
 import { trackEvent } from '@/lib/user-data';
+import { consumeAgentSse } from '@/lib/agent/sse-client';
 
 /**
  * 智能问道：AI 对话页（客户端）。
@@ -27,6 +28,37 @@ const SUGGESTED_QUESTIONS = [
   '道教的三洞四辅是如何分类的？',
 ];
 
+const ASK_HISTORY_KEY = 'dz.ask-history.v1';
+const MAX_STORED_MESSAGES = 10; // 最近 5 轮
+
+function loadAskHistory(): ChatMessage[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = sessionStorage.getItem(ASK_HISTORY_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw) as ChatMessage[];
+    return Array.isArray(parsed) ? parsed.slice(-MAX_STORED_MESSAGES) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveAskHistory(messages: ChatMessage[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    sessionStorage.setItem(
+      ASK_HISTORY_KEY,
+      JSON.stringify(messages.slice(-MAX_STORED_MESSAGES).map(m => ({
+        role: m.role,
+        content: m.content,
+        citations: m.citations,
+      }))),
+    );
+  } catch {
+    // sessionStorage 满或禁用时忽略
+  }
+}
+
 export default function AskPage() {
   const [aiConfigured, setAiConfigured] = useState<boolean | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -35,6 +67,7 @@ export default function AskPage() {
   /** 从阅读页带入的上下文（「问道此书」/「继续追问」入口），可手动移除 */
   const [reading, setReading] = useState<ReadingContext | null>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
+  const [historyReady, setHistoryReady] = useState(false);
 
   // 探测 AI 配置状态：决定展示对话界面还是「尚未开通」状态
   useEffect(() => {
@@ -44,11 +77,19 @@ export default function AskPage() {
       .catch(() => setAiConfigured(false));
   }, []);
 
-  // 消费阅读页暂存的上下文（一次性，取出即清除）
+  // 恢复本会话最近对话；再消费阅读页上下文（须先于 save，避免空数组冲掉历史）
   useEffect(() => {
+    setMessages(loadAskHistory());
+    setHistoryReady(true);
     const ctx = consumeAskContext();
     if (ctx) setReading(ctx);
   }, []);
+
+  // 持久化最近 5 轮，刷新可恢复
+  useEffect(() => {
+    if (!historyReady) return;
+    saveAskHistory(messages);
+  }, [messages, historyReady]);
 
   // 新消息滚动到底部
   useEffect(() => {
@@ -75,31 +116,57 @@ export default function AskPage() {
     try {
       const res = await fetch('/api/agent', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'chat', context }),
+        headers: {
+          'Content-Type': 'application/json',
+          Accept: 'text/event-stream',
+        },
+        body: JSON.stringify({ action: 'chat', context, stream: true }),
       });
-      const data = await res.json();
-      if (res.ok && data.reply) {
-        setMessages([...nextMessages, { role: 'assistant', content: data.reply, citations: data.citations }]);
-      } else {
-        setMessages([...nextMessages, { role: 'assistant', content: `抱歉，${data.error || 'AI 服务暂时不可用，请稍后再试。'}` }]);
-      }
-    } catch {
-      setMessages([...nextMessages, { role: 'assistant', content: '抱歉，网络请求失败，请稍后再试。' }]);
+
+      let reply = '';
+      let citations: Citation[] | undefined;
+      setMessages([...nextMessages, { role: 'assistant', content: '' }]);
+
+      const meta = await consumeAgentSse(res, chunk => {
+        reply += chunk;
+        setMessages(prev => {
+          const base = prev.slice(0, -1);
+          return [...base, { role: 'assistant' as const, content: reply, citations }];
+        });
+      });
+
+      citations = meta.citations as Citation[] | undefined;
+      setMessages([
+        ...nextMessages,
+        { role: 'assistant', content: reply, citations },
+      ]);
+    } catch (e) {
+      setMessages([
+        ...nextMessages,
+        { role: 'assistant', content: `抱歉，${e instanceof Error ? e.message : '网络请求失败，请稍后再试。'}` },
+      ]);
     } finally {
       setLoading(false);
     }
   };
 
-  // AI 未配置：诚实的不可用状态
+  // AI 未配置：诚实的不可用状态（密钥只在服务端 .env，前端绝不提供填钥入口）
   if (aiConfigured === false) {
     return (
       <div className="animate-fade-in text-center py-20">
         <h1 className="text-2xl font-serif tracking-wider mb-4">智能问道</h1>
         <p className="text-sm text-[var(--muted)] max-w-md mx-auto leading-relaxed">
-          AI 问答服务尚未开通。本站是公益项目，AI 能力将在模型服务配置完成后上线，
-          届时您可以就道藏典籍向 AI 提问，并获得带原文引用的解答。
+          AI 问答服务尚未开通。模型密钥仅由站长在服务端配置，浏览器端不提供填钥入口，以免泄露。
         </p>
+        {process.env.NODE_ENV === 'development' && (
+          <div className="mt-6 max-w-lg mx-auto text-left text-xs text-[var(--muted)] bg-[var(--card)] border border-[var(--border)] rounded-lg px-4 py-3 leading-relaxed">
+            <p className="mb-2 text-[var(--text-secondary)]">本地开发：在项目根目录 <code className="text-[var(--accent)]">.env.local</code> 写入后重启 <code>npm run dev</code>：</p>
+            <pre className="whitespace-pre-wrap font-mono text-[11px] text-[var(--text-secondary)]">{`DZ_LLM_API_KEY=sk-...
+DZ_LLM_BASE_URL=https://api.deepseek.com
+DZ_LLM_MODEL=deepseek-v4-pro
+DZ_LLM_MODEL_FAST=deepseek-v4-flash`}</pre>
+          </div>
+        )}
         <Link href="/catalog" className="inline-block mt-8 text-sm text-[var(--accent)] hover:underline">
           先去阅读典籍 →
         </Link>
@@ -111,9 +178,23 @@ export default function AskPage() {
     <div className="animate-fade-in flex flex-col min-h-[70vh]">
       <header className="mb-6">
         <h1 className="text-2xl font-serif tracking-wider mb-2">智能问道</h1>
-        <p className="text-xs text-[var(--muted)]">
-          就道藏典籍向 AI 提问。回答由 AI 生成、仅供参考，请以原文与权威注疏为准。
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs text-[var(--muted)]">
+            就道藏典籍向 AI 提问。回答由 AI 生成、仅供参考，请以原文与权威注疏为准。本页最近对话会暂存在本会话中。
+          </p>
+          {messages.length > 0 && (
+            <button
+              type="button"
+              onClick={() => {
+                setMessages([]);
+                try { sessionStorage.removeItem(ASK_HISTORY_KEY); } catch { /* ignore */ }
+              }}
+              className="shrink-0 text-xs text-[var(--muted)] hover:text-[var(--accent)]"
+            >
+              清空对话
+            </button>
+          )}
+        </div>
 
         {/* 阅读上下文标签：显式可见、可移除，用户始终知道 AI 参考了什么 */}
         {reading && (

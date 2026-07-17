@@ -3,13 +3,9 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { musicActions, useMusicPlayer } from '@/lib/use-music-player';
+import AuthButton from '@/components/auth/AuthButton';
 
-/**
- * 全局导航。
- * 信息架构对应用户的五类核心诉求：浏览（经文目录）、查找（搜索）、
- * 提问（智能问道）、延续（我的书房：最近阅读/收藏/笔记）、了解（关于）。
- * 智能问道页在 AI 未配置时展示诚实的「尚未开通」状态，故入口常驻。
- */
 const navItems = [
   { href: '/', label: '首页' },
   { href: '/catalog', label: '经文目录' },
@@ -23,6 +19,11 @@ const navItems = [
 export default function Nav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
+  const { state } = useMusicPlayer();
+
+  const toggleBackgroundMusic = () => {
+    musicActions.setBackgroundEnabled(!state.backgroundEnabled);
+  };
 
   return (
     <header className="border-b border-[var(--border)]">
@@ -31,7 +32,6 @@ export default function Nav() {
           道可道
         </Link>
 
-        {/* 桌面端导航 */}
         <div className="hidden md:flex items-center gap-6 text-sm">
           {navItems.map(item => (
             <Link
@@ -42,9 +42,22 @@ export default function Nav() {
               {item.label}
             </Link>
           ))}
+          <button
+            type="button"
+            onClick={toggleBackgroundMusic}
+            className={`text-xs px-2 py-1 rounded border transition-colors ${
+              state.backgroundEnabled
+                ? 'border-[var(--accent)] text-[var(--accent)]'
+                : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]'
+            }`}
+            aria-pressed={state.backgroundEnabled}
+            title="切换全局道乐迷你控制条"
+          >
+            背景道乐
+          </button>
+          <AuthButton />
         </div>
 
-        {/* 移动端汉堡按钮 */}
         <button
           className="md:hidden text-[var(--muted)] p-1"
           onClick={() => setOpen(!open)}
@@ -60,7 +73,6 @@ export default function Nav() {
         </button>
       </nav>
 
-      {/* 移动端抽屉菜单 */}
       {open && (
         <div className="md:hidden border-t border-[var(--border)] bg-[var(--bg)]">
           <div className="px-6 py-3 space-y-1">
@@ -74,6 +86,16 @@ export default function Nav() {
                 {item.label}
               </Link>
             ))}
+            <button
+              type="button"
+              onClick={() => {
+                toggleBackgroundMusic();
+                setOpen(false);
+              }}
+              className="block w-full text-left py-2 text-sm text-[var(--muted)]"
+            >
+              背景道乐：{state.backgroundEnabled ? '开' : '关'}
+            </button>
           </div>
         </div>
       )}

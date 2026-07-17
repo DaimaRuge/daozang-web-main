@@ -116,7 +116,7 @@ function buildReferences(question: string, context: AgentContext): { text: strin
 }
 
 export async function runChat(context: AgentContext): Promise<ChatResult> {
-  const provider = getProvider();
+  const provider = getProvider('pro');
   const messages = context.conversation?.messages ?? [];
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
   if (!lastUser) throw new Error('对话中缺少用户消息');
@@ -131,4 +131,25 @@ export async function runChat(context: AgentContext): Promise<ChatResult> {
 
   const reply = await provider.chat(finalMessages, { maxTokens: 1200 });
   return { reply, citations, aiGenerated: true };
+}
+
+/** 流式问答：yield 文本块，最终事件携带 citations */
+export async function* runChatStream(
+  context: AgentContext,
+): AsyncGenerator<{ event: 'chunk' | 'done'; data: unknown }, void, unknown> {
+  const provider = getProvider('pro');
+  const messages = context.conversation?.messages ?? [];
+  const lastUser = [...messages].reverse().find(m => m.role === 'user');
+  if (!lastUser) throw new Error('对话中缺少用户消息');
+
+  const { text: references, citations } = buildReferences(lastUser.content, context);
+  const finalMessages: AgentMessage[] = [
+    { role: 'system', content: CHAT_SYSTEM_PROMPT + (references ? `\n\n参考资料：\n${references}` : '') },
+    ...messages.slice(-10).map(m => ({ role: m.role, content: m.content })),
+  ];
+
+  for await (const chunk of provider.chatStream(finalMessages, { maxTokens: 1200 })) {
+    yield { event: 'chunk', data: { text: chunk } };
+  }
+  yield { event: 'done', data: { citations, aiGenerated: true } };
 }

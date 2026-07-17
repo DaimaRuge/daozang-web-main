@@ -22,7 +22,16 @@ export interface ReadingProgress {
   category: string;
   /** 最近可见的内容块 ID，用于精确定位 */
   blockId?: string;
-  /** 页面滚动百分比 0~1，作为 blockId 缺失时的降级定位 */
+  /** 分页模式：当前页码（0-based） */
+  pageIndex?: number;
+  /** 分页模式：总页数 */
+  totalPages?: number;
+  /** 当前卷次目录 blockId */
+  volumeBlockId?: string;
+  volumeTitle?: string;
+  /** 累计阅读时长（毫秒），本地累计，服务端同步时一并上报 */
+  readingDurationMs?: number;
+  /** 页面滚动百分比 0~1，滚动模式降级定位 */
   scrollProgress: number;
   updatedAt: number;
 }
@@ -67,6 +76,8 @@ export interface ReaderSettings {
   theme: 'paper' | 'sepia' | 'night';
   /** 是否显示整理者按语与低置信度标记 */
   showEditorNotes: boolean;
+  /** 阅读方式：分页（默认）或连续滚动 */
+  readingMode: 'paged' | 'scroll';
 }
 
 export const DEFAULT_READER_SETTINGS: ReaderSettings = {
@@ -75,6 +86,7 @@ export const DEFAULT_READER_SETTINGS: ReaderSettings = {
   width: 'normal',
   theme: 'paper',
   showEditorNotes: true,
+  readingMode: 'paged',
 };
 
 /** 规范化的用户行为事件枚举 —— 新增埋点必须先在此登记 */
@@ -83,14 +95,19 @@ export type UserEvent =
   | 'book_open'
   | 'chapter_open'
   | 'reading_progress'
+  | 'reading_page_turn'
   | 'text_select'
   | 'bookmark_create'
   | 'note_create'
   | 'search'
   | 'ai_question'
   | 'ai_explanation'
+  | 'music_play'
+  | 'music_pause'
   | 'share'
-  | 'recommendation_click';
+  | 'recommendation_click'
+  | 'illustration_generate'
+  | 'illustration_view';
 
 // ---------- 存储实现（localStorage，SSR 安全） ----------
 
@@ -99,6 +116,7 @@ const KEYS = {
   bookmarks: 'dz.bookmarks.v1',
   notes: 'dz.notes.v1',
   settings: 'dz.reader-settings.v1',
+  music: 'dz.music-player.v1',
 } as const;
 
 /** SSR / 隐私模式下 localStorage 不可用时静默降级，不影响阅读主流程 */
@@ -195,14 +213,101 @@ export function saveReaderSettings(s: ReaderSettings): void {
   writeStore(KEYS.settings, s);
 }
 
+// ---------- 全局道乐播放器 ----------
+
+export interface MusicPlayerPersist {
+  /** 是否在非道乐页显示迷你控制条 */
+  backgroundEnabled: boolean;
+  loop: boolean;
+  theme: string;
+  trackId: string | null;
+  currentTime: number;
+}
+
+export const DEFAULT_MUSIC_PLAYER: MusicPlayerPersist = {
+  backgroundEnabled: true,
+  loop: true,
+  theme: 'wuxing',
+  trackId: null,
+  currentTime: 0,
+};
+
+export function getMusicPlayerState(): MusicPlayerPersist {
+  return { ...DEFAULT_MUSIC_PLAYER, ...readStore<Partial<MusicPlayerPersist>>(KEYS.music, {}) };
+}
+
+export function saveMusicPlayerState(p: MusicPlayerPersist): void {
+  writeStore(KEYS.music, p);
+}
+
 // ---------- 行为事件 ----------
 
+const EVENTS_KEY = 'dz.session-id';
+let sessionIdCache: string | null = null;
+const pendingEvents: Array<{
+  event: UserEvent;
+  sessionId: string;
+  bookId?: string;
+  extra?: Record<string, unknown>;
+  ts: number;
+}> = [];
+let flushTimer: ReturnType<typeof setTimeout> | null = null;
+
+function getSessionId(): string {
+  if (sessionIdCache) return sessionIdCache;
+  if (typeof window === 'undefined') return 'ssr';
+  try {
+    let id = window.localStorage.getItem(EVENTS_KEY);
+    if (!id) {
+      id = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
+      window.localStorage.setItem(EVENTS_KEY, id);
+    }
+    sessionIdCache = id;
+    return id;
+  } catch {
+    return 'anonymous';
+  }
+}
+
+function flushEvents(): void {
+  if (typeof window === 'undefined' || pendingEvents.length === 0) return;
+  const batch = pendingEvents.splice(0, 50);
+  fetch('/api/events', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(
+      batch.map(e => ({
+        event: e.event,
+        sessionId: e.sessionId,
+        bookId: e.bookId,
+        extra: { ...e.extra, ts: e.ts },
+      })),
+    ),
+    keepalive: true,
+  }).catch(() => {
+    pendingEvents.unshift(...batch);
+  });
+}
+
 /**
- * 统一事件入口。当前仅在开发环境打印，不做任何上报；
- * 未来接入分析服务时在此处统一实现（含用户偏好开关），页面代码无需改动。
+ * 统一事件入口。开发环境打印；生产批量上报 POST /api/events。
  */
 export function trackEvent(event: UserEvent, payload?: Record<string, unknown>): void {
   if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
     console.debug('[dz-event]', event, payload ?? {});
   }
+  if (typeof window === 'undefined') return;
+
+  const bookId = typeof payload?.bookId === 'string' ? payload.bookId : undefined;
+  const { bookId: _b, ...extra } = payload ?? {};
+  pendingEvents.push({
+    event,
+    sessionId: getSessionId(),
+    bookId,
+    extra: Object.keys(extra).length ? extra : undefined,
+    ts: Date.now(),
+  });
+
+  if (flushTimer) clearTimeout(flushTimer);
+  flushTimer = setTimeout(flushEvents, 1500);
 }

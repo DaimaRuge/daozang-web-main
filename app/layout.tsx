@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import Nav from '@/components/Nav';
+import MusicProvider from '@/components/music/MusicProvider';
+import AuthProvider from '@/components/auth/AuthProvider';
 
 export const metadata: Metadata = {
   title: {
@@ -27,11 +29,13 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet" />
       </head>
       <body className="min-h-screen bg-[var(--bg)] text-[var(--text)]">
-        <Nav />
-        <main className="max-w-4xl mx-auto px-6 py-8">
-          {children}
-        </main>
-        <footer className="border-t border-[var(--border)] mt-16">
+        <MusicProvider>
+          <AuthProvider>
+          <Nav />
+          <main className="max-w-4xl mx-auto px-6 py-8 pb-20">
+            {children}
+          </main>
+          <footer className="border-t border-[var(--border)] mt-16 mb-14">
           <div className="max-w-4xl mx-auto px-6 py-8 text-center text-sm text-[var(--muted)] space-y-2">
             <p>道可道 · 道藏经文藏书阁</p>
             <p className="text-xs">本站所有文本仅供学术研究用途，不作任何商业用途。文本版权归原作者及相关机构所有。</p>
@@ -41,6 +45,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
             </div>
           </div>
         </footer>
+          </AuthProvider>
+        </MusicProvider>
       </body>
     </html>
   );

@@ -2,6 +2,7 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
+  serverExternalPackages: ['better-sqlite3'],
   outputFileTracingExcludes: {
     '*': ['./data/daozang-text/**', './data/daozang-text-utf8/**', './data/daozang-text-new/**', './data/daozang-text-orig/**'],
   },

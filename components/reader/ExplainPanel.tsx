@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ReadingContext, createDefaultContext } from '@/lib/agent/context';
 import { stashAskContext } from '@/lib/ask-context';
 import { trackEvent } from '@/lib/user-data';
+import { consumeAgentSse } from '@/lib/agent/sse-client';
 
 /**
  * AI 解释/译文面板：划词「问道」「译文」的结果展示层。
@@ -20,6 +21,7 @@ import { trackEvent } from '@/lib/user-data';
 const TOOL_LABELS = {
   explain_selected_text: { title: '問道', subtitle: 'AI 解释 · 仅供参考' },
   translate_to_modern_chinese: { title: '譯文', subtitle: 'AI 现代汉语转写 · 仅供参考' },
+  generate_summary: { title: '導讀', subtitle: 'AI 本页摘要 · 仅供参考' },
 } as const;
 
 export type ExplainTool = keyof typeof TOOL_LABELS;
@@ -55,33 +57,38 @@ export default function ExplainPanel({
 
     const context = createDefaultContext({ path: `/text/${reading.bookId}`, pageType: 'reader' });
     context.reading = reading;
-    // 用户主动点击「问道」/「译文」即视为同意本次 AI 调用
     context.permissions.canUseAI = true;
 
     fetch('/api/agent', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'text/event-stream',
+      },
       body: JSON.stringify({
         action: 'tool',
         tool,
         input: { text: sourceText },
         context,
+        stream: true,
       }),
       signal: controller.signal,
     })
-      .then(r => r.json())
-      .then(data => {
-        if (data.ok && data.result?.explanation) {
-          setExplanation(data.result.explanation);
+      .then(async res => {
+        let accumulated = '';
+        await consumeAgentSse(res, chunk => {
+          accumulated += chunk;
+          setExplanation(accumulated);
           setState('done');
-        } else {
-          setError(data.error || 'AI 服务暂时不可用');
+        });
+        if (!accumulated) {
+          setError('AI 服务暂时不可用');
           setState('error');
         }
       })
-      .catch(() => {
+      .catch(e => {
         if (!controller.signal.aborted) {
-          setError('网络请求失败，请稍后重试');
+          setError(e instanceof Error ? e.message : '网络请求失败，请稍后重试');
           setState('error');
         }
       });

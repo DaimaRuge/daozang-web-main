@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { ReadingProgress, getRecentReading } from '@/lib/user-data';
 import { useLocalData } from '@/lib/use-local-data';
+import { readingProgressLabel, readingResumeHref } from '@/lib/reading-url';
 
 /** SSR 快照用的稳定空数组（避免每次渲染生成新引用） */
 const EMPTY: ReadingProgress[] = [];
@@ -27,7 +28,7 @@ export default function ContinueReading() {
         {recent.map(r => (
           <Link
             key={r.bookId}
-            href={`/text/${r.bookId}`}
+            href={readingResumeHref(r)}
             className="block px-5 py-4 bg-[var(--card)] border border-[var(--border)] rounded-lg hover:bg-[var(--card-hover)] transition-all group"
           >
             <div className="text-sm font-medium group-hover:text-[var(--accent)] transition-colors truncate">
@@ -37,7 +38,7 @@ export default function ContinueReading() {
               <div className="flex-1 h-1 bg-[var(--border)] rounded-full overflow-hidden">
                 <div className="h-full bg-[var(--accent-light)]" style={{ width: `${r.scrollProgress * 100}%` }} />
               </div>
-              <span className="text-xs text-[var(--muted)] shrink-0">{Math.round(r.scrollProgress * 100)}%</span>
+              <span className="text-xs text-[var(--muted)] shrink-0">{readingProgressLabel(r)}</span>
             </div>
           </Link>
         ))}

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { stashAskContext } from '@/lib/ask-context';
 import { ParsedBook } from '@/lib/content-schema';
 import { DaozangEntry } from '@/lib/data';
@@ -22,7 +22,18 @@ import SettingsPanel from './SettingsPanel';
 import SelectionToolbar, { SelectionInfo } from './SelectionToolbar';
 import NoteDialog from './NoteDialog';
 import ExplainPanel, { ExplainTool } from './ExplainPanel';
+import IllustrationPanel from './IllustrationPanel';
 import InBookSearch from './InBookSearch';
+import PageControls from './PageControls';
+import {
+  paginateBlocks,
+  findPageForBlockId,
+  findVolumeForBlockIndex,
+  pageFromLegacyScroll,
+} from '@/lib/book-pagination';
+import { TocItem } from '@/lib/content-schema';
+import { syncProgressToServer } from '@/lib/sync-progress';
+import { enrichTocWithPages } from '@/lib/toc-enriched';
 
 /** AI 配置状态的会话级缓存：每次会话只探测一次，切换典籍不重复请求 */
 let aiConfiguredCache: boolean | null = null;
@@ -76,6 +87,16 @@ function useActiveTocId(toc: { blockId: string }[]): string | null {
   return activeId;
 }
 
+/** 分页模式：根据当前页起始块推断目录高亮项 */
+function activeTocForPage(toc: TocItem[], startBlockIndex: number, blocks: { id: string }[]): string | null {
+  let active: string | null = null;
+  for (const item of toc) {
+    const idx = blocks.findIndex(b => b.id === item.blockId);
+    if (idx >= 0 && idx <= startBlockIndex) active = item.blockId;
+  }
+  return active ?? toc[0]?.blockId ?? null;
+}
+
 /**
  * 阅读器主组件（客户端）。
  *
@@ -102,39 +123,52 @@ export default function Reader({
   next: AdjacentLink;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   /** 底本校勘 #N 索引：按卷域关联正文引用与校勘条目 */
   const footnoteIndex = useMemo(() => buildFootnoteIndex(parsed.blocks), [parsed.blocks]);
 
-  /** 脚注/目录/书内搜索共用的块定位：平滑滚动 + 短暂高亮 + 更新 URL 锚点 */
-  const navigateToBlock = useCallback((blockId: string) => {
-    window.history.replaceState(null, '', `#${blockId}`);
-    const scrollTo = () => {
-      const el = document.getElementById(blockId);
-      if (!el) return false;
-      el.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      el.classList.add('block-flash');
-      setTimeout(() => el.classList.remove('block-flash'), 1600);
-      return true;
-    };
-    if (!scrollTo()) {
-      // 极少数情况下块尚未挂载，下一帧重试
-      requestAnimationFrame(() => scrollTo());
-    }
-  }, []);
-
-  /** 支持带 hash 打开阅读页时自动定位（如分享脚注链接） */
-  useEffect(() => {
-    const hash = window.location.hash.slice(1);
-    if (!hash) return;
-    const timer = window.setTimeout(() => navigateToBlock(hash), 300);
-    return () => window.clearTimeout(timer);
-  }, [entry.id, navigateToBlock]);
-
-  // ---- 阅读设置：水合安全的共享 store，本地持久化 ----
   const [settings, updateSettings] = useReaderSettings();
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [tocOpen, setTocOpen] = useState(false);
+
+  /** 分页切片 */
+  const pages = useMemo(() => paginateBlocks(parsed.blocks), [parsed.blocks]);
+  const totalPages = pages.length;
+  const [currentPage, setCurrentPage] = useState(0);
+  const pendingBlockRef = useRef<string | null>(null);
+  const pageEnteredAtRef = useRef(Date.now());
+  const isPaged = settings.readingMode === 'paged';
+
+  const enrichedToc = useMemo(
+    () => enrichTocWithPages(parsed.toc, parsed.blocks, pages),
+    [parsed.toc, parsed.blocks, pages],
+  );
+
+  /** PRD §5：同步 ?page=N&volume=blockId，支持浏览器前进后退 */
+  const syncReadingUrl = useCallback(
+    (pageIdx: number, replace = false) => {
+      if (!isPaged) return;
+      const vol = pageMetaFor(pageIdx);
+      const params = new URLSearchParams(searchParams.toString());
+      params.set('page', String(pageIdx + 1));
+      if (vol.blockId) params.set('volume', vol.blockId);
+      else params.delete('volume');
+      const url = `/text/${entry.id}?${params.toString()}`;
+      if (replace) router.replace(url, { scroll: false });
+      else router.push(url, { scroll: false });
+    },
+    [isPaged, entry.id, router, searchParams],
+  );
+
+  function pageMetaFor(pageIdx: number) {
+    const page = pages[pageIdx];
+    if (!page) return {};
+    return findVolumeForBlockIndex(parsed.toc, page.startBlockIndex, parsed.blocks);
+  }
+
+  /** 支持带 hash 打开阅读页时自动定位 —— navigateToBlock 定义见 goToPage 之后 */
+  const navigateToBlockRef = useRef<(blockId: string) => void>(() => {});
 
   // ---- 划词与笔记 ----
   const [selection, setSelection] = useState<SelectionInfo | null>(null);
@@ -150,14 +184,31 @@ export default function Reader({
     blockId?: string;
     scrollProgress?: number;
   } | null>(null);
+  const [illustrationSource, setIllustrationSource] = useState<{
+    text: string;
+    blockId?: string;
+  } | null>(null);
 
   // ---- 进度 ----
   const [progress, setProgress] = useState(0);
   // 历史进度从本地读取（水合安全）；「继续阅读」提示可被用户关闭且不自动跳转
   const [savedProgress] = useLocalData(() => getProgress(entry.id), undefined);
   const [resumeDismissed, setResumeDismissed] = useState(false);
+  const [pageRestored, setPageRestored] = useState(false);
+
+  const resumePage =
+    isPaged &&
+    !resumeDismissed &&
+    savedProgress &&
+    ((savedProgress.pageIndex != null && savedProgress.pageIndex > 0 && savedProgress.pageIndex < totalPages - 1) ||
+      (savedProgress.pageIndex == null && savedProgress.scrollProgress > 0.02 && savedProgress.scrollProgress < 0.98));
+
   const resumeAt =
-    !resumeDismissed && savedProgress && savedProgress.scrollProgress > 0.02 && savedProgress.scrollProgress < 0.98
+    !isPaged &&
+    !resumeDismissed &&
+    savedProgress &&
+    savedProgress.scrollProgress > 0.02 &&
+    savedProgress.scrollProgress < 0.98
       ? savedProgress.scrollProgress
       : null;
 
@@ -166,7 +217,171 @@ export default function Reader({
   const readingCtxRef = useRef<ReadingContext>({ bookId: entry.id, bookTitle: entry.title });
 
   // 目录当前章高亮
-  const activeTocId = useActiveTocId(parsed.toc);
+  const scrollActiveTocId = useActiveTocId(isPaged ? [] : parsed.toc);
+  const pageMeta = pages[currentPage];
+  const pageVolume = pageMeta
+    ? findVolumeForBlockIndex(parsed.toc, pageMeta.startBlockIndex, parsed.blocks)
+    : {};
+  const activeTocId = isPaged && pageMeta
+    ? activeTocForPage(parsed.toc, pageMeta.startBlockIndex, parsed.blocks)
+    : scrollActiveTocId;
+
+  const visibleBlocks = isPaged && pageMeta
+    ? parsed.blocks.slice(pageMeta.startBlockIndex, pageMeta.endBlockIndex + 1)
+    : parsed.blocks;
+
+  /** 恢复上次阅读页码（URL ?page= 优先于 localStorage） */
+  useEffect(() => {
+    if (pageRestored || !isPaged) return;
+    const urlPage = searchParams.get('page');
+    if (urlPage) {
+      const n = parseInt(urlPage, 10);
+      if (!Number.isNaN(n) && n >= 1 && n <= totalPages) {
+        setCurrentPage(n - 1);
+        setPageRestored(true);
+        return;
+      }
+    }
+    if (savedProgress) {
+      if (savedProgress.pageIndex != null && savedProgress.totalPages === totalPages) {
+        setCurrentPage(savedProgress.pageIndex);
+        syncReadingUrl(savedProgress.pageIndex, true);
+      } else if (savedProgress.scrollProgress > 0) {
+        const idx = pageFromLegacyScroll(savedProgress.scrollProgress, totalPages);
+        setCurrentPage(idx);
+        syncReadingUrl(idx, true);
+      }
+    }
+    setPageRestored(true);
+  }, [savedProgress, isPaged, totalPages, pageRestored, searchParams, syncReadingUrl]);
+
+  /** 浏览器前进/后退：searchParams 变化时同步页码 */
+  useEffect(() => {
+    if (!isPaged || !pageRestored) return;
+    const urlPage = searchParams.get('page');
+    if (!urlPage) return;
+    const n = parseInt(urlPage, 10);
+    if (!Number.isNaN(n) && n >= 1 && n <= totalPages) {
+      setCurrentPage(n - 1);
+    }
+  }, [searchParams, isPaged, totalPages, pageRestored]);
+
+  /** 翻页后处理待定位块 + 预加载相邻页 API */
+  useEffect(() => {
+    if (!isPaged) return;
+    pageEnteredAtRef.current = Date.now();
+    const id = pendingBlockRef.current;
+    if (id) {
+      pendingBlockRef.current = null;
+      requestAnimationFrame(() => {
+        document.getElementById(id)?.classList.add('block-flash');
+        setTimeout(() => document.getElementById(id)?.classList.remove('block-flash'), 1600);
+      });
+    }
+    window.scrollTo({ top: 0, behavior: 'instant' as ScrollBehavior });
+    const pageNum = currentPage + 1;
+    if (currentPage + 1 < totalPages) {
+      fetch(`/api/articles/${entry.id}/page/${pageNum + 1}`, { priority: 'low' } as RequestInit).catch(() => {});
+    }
+    if (currentPage > 0) {
+      fetch(`/api/articles/${entry.id}/page/${pageNum - 1}`, { priority: 'low' } as RequestInit).catch(() => {});
+    }
+  }, [currentPage, isPaged, entry.id, totalPages]);
+
+  const persistReadingProgress = useCallback((pageIdx: number) => {
+    const page = pages[pageIdx];
+    if (!page) return;
+    const vol = findVolumeForBlockIndex(parsed.toc, page.startBlockIndex, parsed.blocks);
+    const blockId = page.blockIds[0];
+    const durationDelta = Date.now() - pageEnteredAtRef.current;
+    pageEnteredAtRef.current = Date.now();
+    const prevDuration = getProgress(entry.id)?.readingDurationMs ?? 0;
+    const payload = {
+      bookId: entry.id,
+      bookTitle: entry.title,
+      category: entry.category,
+      blockId,
+      pageIndex: pageIdx,
+      totalPages,
+      volumeBlockId: vol.blockId,
+      volumeTitle: vol.title,
+      scrollProgress: totalPages > 1 ? pageIdx / (totalPages - 1) : 0,
+      readingDurationMs: prevDuration + durationDelta,
+    };
+    saveProgress(payload);
+    syncProgressToServer({ ...payload, readingDurationMs: durationDelta });
+    trackEvent('reading_progress', {
+      bookId: entry.id,
+      pageIndex: pageIdx,
+      pageNum: pageIdx + 1,
+      volumeBlockId: vol.blockId,
+      volumeTitle: vol.title,
+    });
+    readingCtxRef.current.blockId = blockId;
+    readingCtxRef.current.scrollProgress = payload.scrollProgress;
+  }, [pages, parsed.toc, parsed.blocks, entry.id, entry.title, entry.category, totalPages]);
+
+  const goToPage = useCallback((pageIdx: number) => {
+    if (pageIdx < 0 || pageIdx >= totalPages) return;
+    setCurrentPage(pageIdx);
+    persistReadingProgress(pageIdx);
+    setProgress(totalPages > 1 ? pageIdx / (totalPages - 1) : 0);
+    syncReadingUrl(pageIdx);
+    trackEvent('reading_page_turn', {
+      bookId: entry.id,
+      pageIndex: pageIdx,
+      pageNum: pageIdx + 1,
+      direction: pageIdx > currentPage ? 'next' : 'prev',
+    });
+  }, [totalPages, persistReadingProgress, syncReadingUrl, entry.id, currentPage]);
+
+  const navigateToBlock = useCallback((blockId: string) => {
+    if (isPaged) {
+      const pageIdx = findPageForBlockId(pages, parsed.blocks, blockId);
+      pendingBlockRef.current = blockId;
+      goToPage(pageIdx);
+    }
+    window.history.replaceState(null, '', `#${blockId}`);
+    const scrollTo = () => {
+      const el = document.getElementById(blockId);
+      if (!el) return false;
+      if (!isPaged) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
+      el.classList.add('block-flash');
+      setTimeout(() => el.classList.remove('block-flash'), 1600);
+      return true;
+    };
+    if (!isPaged) {
+      if (!scrollTo()) requestAnimationFrame(() => scrollTo());
+    }
+  }, [pages, parsed.blocks, isPaged, goToPage]);
+
+  navigateToBlockRef.current = navigateToBlock;
+
+  useEffect(() => {
+    const hash = window.location.hash.slice(1);
+    if (!hash) return;
+    const timer = window.setTimeout(() => navigateToBlockRef.current(hash), 300);
+    return () => window.clearTimeout(timer);
+  }, [entry.id]);
+
+  /** 离开阅读页时 flush 进度 */
+  useEffect(() => {
+    const flush = () => {
+      if (isPaged) persistReadingProgress(currentPage);
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'hidden') flush();
+    });
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      flush();
+    };
+  }, [isPaged, currentPage, persistReadingProgress]);
 
   /** 传给 AI 解释面板的阅读上下文：memo 化避免滚动重渲染导致面板重复请求 */
   const explainReading = useMemo<ReadingContext | null>(
@@ -206,8 +421,12 @@ export default function Reader({
     return () => document.documentElement.removeAttribute('data-reader-theme');
   }, [settings.theme]);
 
-  // ---- 滚动进度追踪：节流保存，供「继续阅读」与书房「最近阅读」使用 ----
+  // ---- 滚动进度追踪（滚动模式） ----
   useEffect(() => {
+    if (isPaged) {
+      setProgress(totalPages > 1 ? currentPage / (totalPages - 1) : 0);
+      return;
+    }
     let ticking = false;
     let lastSave = 0;
     const onScroll = () => {
@@ -220,7 +439,6 @@ export default function Reader({
         const p = max > 0 ? Math.min(1, Math.max(0, window.scrollY / max)) : 0;
         setProgress(p);
         readingCtxRef.current.scrollProgress = p;
-        // 5 秒最多保存一次，避免频繁写 localStorage
         const now = Date.now();
         if (now - lastSave > 5000) {
           lastSave = now;
@@ -229,13 +447,51 @@ export default function Reader({
             bookTitle: entry.title,
             category: entry.category,
             scrollProgress: p,
+            blockId: scrollActiveTocId ?? undefined,
           });
         }
       });
     };
     window.addEventListener('scroll', onScroll, { passive: true });
     return () => window.removeEventListener('scroll', onScroll);
-  }, [entry.id, entry.title, entry.category]);
+  }, [entry.id, entry.title, entry.category, isPaged, currentPage, totalPages, scrollActiveTocId]);
+
+  /** 分页模式：翻页时保存进度 */
+  useEffect(() => {
+    if (!isPaged || !pageRestored) return;
+    persistReadingProgress(currentPage);
+  }, [currentPage, isPaged, pageRestored, persistReadingProgress]);
+
+  /** 键盘左右翻页 + 移动端滑动 */
+  useEffect(() => {
+    if (!isPaged) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+      if (e.key === 'ArrowLeft') goToPage(currentPage - 1);
+      if (e.key === 'ArrowRight') goToPage(currentPage + 1);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isPaged, currentPage, goToPage]);
+
+  useEffect(() => {
+    if (!isPaged || !articleRef.current) return;
+    let startX = 0;
+    const el = articleRef.current;
+    const onStart = (e: TouchEvent) => { startX = e.touches[0].clientX; };
+    const onEnd = (e: TouchEvent) => {
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) < 60) return;
+      if (dx < 0) goToPage(currentPage + 1);
+      else goToPage(currentPage - 1);
+    };
+    el.addEventListener('touchstart', onStart, { passive: true });
+    el.addEventListener('touchend', onEnd, { passive: true });
+    return () => {
+      el.removeEventListener('touchstart', onStart);
+      el.removeEventListener('touchend', onEnd);
+    };
+  }, [isPaged, currentPage, goToPage]);
 
   // ---- 划词监听：仅响应正文区域内的选区 ----
   useEffect(() => {
@@ -307,11 +563,16 @@ export default function Reader({
       tool,
       text: selection.text,
       blockId: selection.blockId,
-      // 在事件处理器中读取阅读上下文快照（渲染期间不允许访问 ref）
       scrollProgress: readingCtxRef.current.scrollProgress,
     });
     setSelection(null);
     trackEvent('ai_question', { bookId: entry.id, tool });
+  };
+
+  const handleIllustrate = () => {
+    if (!selection) return;
+    setIllustrationSource({ text: selection.text, blockId: selection.blockId });
+    setSelection(null);
   };
 
   const handleSaveNote = (noteText: string) => {
@@ -350,7 +611,36 @@ export default function Reader({
     router.push('/ask');
   };
 
+  /** 「本页摘要」：对当前可见正文生成导读（不写入原文） */
+  const handlePageSummary = () => {
+    const text = visibleBlocks
+      .filter(b => b.type === 'paragraph' || b.type === 'heading' || b.type === 'subheading' || b.type === 'annotation')
+      .map(b => b.content)
+      .join('\n')
+      .slice(0, 6000);
+    if (!text.trim()) {
+      showToast('当前页无可摘要正文');
+      return;
+    }
+    setExplainSource({
+      tool: 'generate_summary',
+      text,
+      blockId: visibleBlocks[0]?.id,
+      scrollProgress: readingCtxRef.current.scrollProgress,
+    });
+    trackEvent('ai_question', { bookId: entry.id, tool: 'generate_summary' });
+  };
+
   const handleResume = () => {
+    if (isPaged && savedProgress) {
+      const idx =
+        savedProgress.pageIndex != null && savedProgress.totalPages === totalPages
+          ? savedProgress.pageIndex
+          : pageFromLegacyScroll(savedProgress.scrollProgress ?? 0, totalPages);
+      goToPage(idx);
+      setResumeDismissed(true);
+      return;
+    }
     if (resumeAt === null) return;
     const doc = document.documentElement;
     window.scrollTo({ top: (doc.scrollHeight - window.innerHeight) * resumeAt, behavior: 'smooth' });
@@ -411,7 +701,10 @@ export default function Reader({
       <div className="flex items-center justify-end gap-2 mb-4 relative">
         {/* AI 已配置才展示：带阅读上下文进入问道页 */}
         {aiConfigured && (
-          <button onClick={handleAskAboutBook} className={toolBtn}>问道此书</button>
+          <>
+            <button onClick={handleAskAboutBook} className={toolBtn}>问道此书</button>
+            <button onClick={handlePageSummary} className={toolBtn}>本页摘要</button>
+          </>
         )}
         <button onClick={handleBookmarkBook} className={toolBtn}>收藏本书</button>
         <button onClick={handleCopyAll} className={toolBtn}>复制全文</button>
@@ -437,7 +730,7 @@ export default function Reader({
             {parsed.toc.length > 1 && (
               <>
                 <p className="text-xs text-[var(--muted)] mb-2 tracking-wider">目 录</p>
-                <TocPanel toc={parsed.toc} activeId={activeTocId} />
+                <TocPanel toc={enrichedToc} activeId={activeTocId} onNavigateToBlock={navigateToBlock} />
               </>
             )}
           </div>
@@ -445,9 +738,13 @@ export default function Reader({
 
         <div className={`flex-1 min-w-0 mx-auto ${widthClass} relative`} ref={articleRef}>
           {/* 继续阅读提示：可关闭、不自动跳转 */}
-          {resumeAt !== null && (
+          {(resumeAt !== null || resumePage) && (
             <div className="mb-6 flex items-center justify-between gap-3 px-4 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-lg text-xs animate-fade-in">
-              <span className="text-[var(--muted)]">上次读到 {Math.round(resumeAt * 100)}%，是否继续？</span>
+              <span className="text-[var(--muted)]">
+                {isPaged && savedProgress?.pageIndex != null
+                  ? `上次读到第 ${savedProgress.pageIndex + 1} 页${savedProgress.volumeTitle ? ` · ${savedProgress.volumeTitle}` : ''}，是否继续？`
+                  : `上次读到 ${Math.round((resumeAt ?? savedProgress?.scrollProgress ?? 0) * 100)}%，是否继续？`}
+              </span>
               <div className="flex gap-2 shrink-0">
                 <button onClick={handleResume} className="text-[var(--accent)] hover:underline">继续阅读</button>
                 <button onClick={() => setResumeDismissed(true)} className="text-[var(--muted)] hover:text-[var(--text)]" aria-label="关闭">✕</button>
@@ -465,12 +762,21 @@ export default function Reader({
             }
           >
             <BlockRenderer
-              blocks={parsed.blocks}
+              blocks={visibleBlocks}
               showEditorNotes={settings.showEditorNotes}
               footnoteIndex={footnoteIndex}
               onFootnoteNavigate={navigateToBlock}
             />
           </article>
+
+          {isPaged && totalPages > 1 && (
+            <PageControls
+              pageIndex={currentPage}
+              totalPages={totalPages}
+              onPageChange={goToPage}
+              volumeTitle={pageVolume.title}
+            />
+          )}
 
           {selection && (
             <SelectionToolbar
@@ -481,6 +787,7 @@ export default function Reader({
               // AI 未配置时保持禁用态（能力预告而非伪装）
               onAskAI={aiConfigured ? () => handleAskAI('explain_selected_text') : undefined}
               onTranslate={aiConfigured ? () => handleAskAI('translate_to_modern_chinese') : undefined}
+              onIllustrate={aiConfigured ? handleIllustrate : undefined}
             />
           )}
 
@@ -507,10 +814,14 @@ export default function Reader({
       </div>
 
       {/* 移动端底部工具栏：目录 / 设置 / 回顶部 */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-[var(--card)] border-t border-[var(--border)] flex justify-around py-2 text-xs text-[var(--muted)]">
+      <div className="lg:hidden fixed bottom-14 left-0 right-0 z-40 bg-[var(--card)] border-t border-[var(--border)] flex justify-around py-2 text-xs text-[var(--muted)] reader-mobile-bar">
         <button onClick={() => setTocOpen(true)} className="px-4 py-1">目录</button>
         <button onClick={() => setSettingsOpen(!settingsOpen)} className="px-4 py-1">设置</button>
-        <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="px-4 py-1">回顶</button>
+        {isPaged ? (
+          <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage >= totalPages - 1} className="px-4 py-1 disabled:opacity-40">下一页</button>
+        ) : (
+          <button onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })} className="px-4 py-1">回顶</button>
+        )}
       </div>
 
       {/* 移动端目录抽屉（含书内搜索） */}
@@ -526,7 +837,12 @@ export default function Reader({
               onNavigateToBlock={navigateToBlock}
             />
             <p className="text-xs text-[var(--muted)] mb-3 tracking-wider">目 录</p>
-            <TocPanel toc={parsed.toc} activeId={activeTocId} onNavigate={() => setTocOpen(false)} />
+            <TocPanel
+              toc={enrichedToc}
+              activeId={activeTocId}
+              onNavigateToBlock={navigateToBlock}
+              onNavigate={() => setTocOpen(false)}
+            />
           </div>
         </div>
       )}
@@ -545,6 +861,15 @@ export default function Reader({
           sourceText={explainSource.text}
           reading={explainReading}
           onClose={() => setExplainSource(null)}
+        />
+      )}
+
+      {illustrationSource && (
+        <IllustrationPanel
+          bookId={entry.id}
+          blockId={illustrationSource.blockId}
+          sourceText={illustrationSource.text}
+          onClose={() => setIllustrationSource(null)}
         />
       )}
 

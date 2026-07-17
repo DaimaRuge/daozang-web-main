@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getEntryById, getContentById, getAdjacentEntries } from '@/lib/data';
@@ -47,13 +48,14 @@ export default async function TextPage({ params }: PageProps) {
   const { prev, next } = getAdjacentEntries(id);
 
   return (
-    // key 保证切换典籍时阅读器完整重挂载，本地进度缓存不会串书
-    <Reader
-      key={id}
-      entry={entry}
-      parsed={parsed}
-      prev={prev ? { id: prev.id, title: prev.title } : null}
-      next={next ? { id: next.id, title: next.title } : null}
-    />
+    <Suspense fallback={<p className="text-sm text-[var(--muted)] py-12 text-center">加载阅读器…</p>}>
+      <Reader
+        key={id}
+        entry={entry}
+        parsed={parsed}
+        prev={prev ? { id: prev.id, title: prev.title } : null}
+        next={next ? { id: next.id, title: next.title } : null}
+      />
+    </Suspense>
   );
 }

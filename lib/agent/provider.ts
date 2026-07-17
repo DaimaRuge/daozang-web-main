@@ -19,6 +19,8 @@ export interface LLMProvider {
   isConfigured(): boolean;
   /** 对话补全：输入通用消息格式，返回助手回复文本 */
   chat(messages: AgentMessage[], options?: ChatOptions): Promise<string>;
+  /** 流式对话补全：逐块 yield 文本 delta */
+  chatStream(messages: AgentMessage[], options?: ChatOptions): AsyncGenerator<string, void, unknown>;
 }
 
 export interface ChatOptions {
@@ -39,6 +41,10 @@ export class NullProvider implements LLMProvider {
   }
 
   async chat(): Promise<string> {
+    throw new AgentNotConfiguredError();
+  }
+
+  async *chatStream(): AsyncGenerator<string, void, unknown> {
     throw new AgentNotConfiguredError();
   }
 }
@@ -104,20 +110,78 @@ export class OpenAICompatibleProvider implements LLMProvider {
     if (typeof content !== 'string') throw new Error('AI 服务返回格式异常');
     return content;
   }
+
+  async *chatStream(messages: AgentMessage[], options?: ChatOptions): AsyncGenerator<string, void, unknown> {
+    const res = await fetch(`${this.baseUrl}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: messages.map(m => ({ role: m.role, content: m.content })),
+        temperature: options?.temperature ?? 0.3,
+        max_tokens: options?.maxTokens ?? 1024,
+        stream: true,
+      }),
+      signal: AbortSignal.timeout(120_000),
+    });
+
+    if (!res.ok || !res.body) {
+      const detail = await res.text().catch(() => '');
+      console.error('[llm-provider stream]', res.status, detail.slice(0, 500));
+      throw new Error(`AI 服务调用失败（${res.status}）`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed.startsWith('data:')) continue;
+        const payload = trimmed.slice(5).trim();
+        if (payload === '[DONE]') return;
+        try {
+          const json = JSON.parse(payload);
+          const delta = json?.choices?.[0]?.delta?.content;
+          if (typeof delta === 'string' && delta) yield delta;
+        } catch {
+          // 忽略不完整 JSON 行
+        }
+      }
+    }
+  }
 }
+
+/** DeepSeek OpenAI 兼容默认值（见 https://api-docs.deepseek.com） */
+const DEFAULT_BASE_URL = 'https://api.deepseek.com';
+const DEFAULT_MODEL_PRO = 'deepseek-v4-pro';
+const DEFAULT_MODEL_FAST = 'deepseek-v4-flash';
 
 /**
  * 供应商工厂：由环境变量决定实现，业务代码不感知具体供应商。
- * 所需环境变量（仅服务端）：
- *   DZ_LLM_BASE_URL  如 https://api.deepseek.com/v1
- *   DZ_LLM_API_KEY   密钥
- *   DZ_LLM_MODEL     模型名，如 deepseek-chat
+ * 所需环境变量（仅服务端，切勿暴露到前端）：
+ *   DZ_LLM_API_KEY / DEEPSEEK_API_KEY  密钥（二选一，必填）
+ *   DZ_LLM_BASE_URL  默认 https://api.deepseek.com
+ *   DZ_LLM_MODEL     主模型，默认 deepseek-v4-pro（问道/复杂问答）
+ *   DZ_LLM_MODEL_FAST 快速模型，默认 deepseek-v4-flash（划词释义/译文）
  */
-export function getProvider(): LLMProvider {
-  const baseUrl = process.env.DZ_LLM_BASE_URL;
-  const apiKey = process.env.DZ_LLM_API_KEY;
-  const model = process.env.DZ_LLM_MODEL;
-  if (baseUrl && apiKey && model) {
+export function getProvider(tier: 'fast' | 'pro' = 'pro'): LLMProvider {
+  const baseUrl = (process.env.DZ_LLM_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '');
+  const apiKey = process.env.DZ_LLM_API_KEY || process.env.DEEPSEEK_API_KEY;
+  const proModel = process.env.DZ_LLM_MODEL || DEFAULT_MODEL_PRO;
+  const fastModel = process.env.DZ_LLM_MODEL_FAST || DEFAULT_MODEL_FAST;
+  const model = tier === 'fast' ? fastModel : proModel;
+  // 仅密钥必填；base / model 有官方默认，避免漏配模型名导致整站 AI 不可用
+  if (apiKey && model) {
     return new OpenAICompatibleProvider(baseUrl, apiKey, model);
   }
   return new NullProvider();
