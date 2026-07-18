@@ -1,3 +1,4 @@
+import Image from 'next/image';
 import Link from 'next/link';
 import { searchEntries } from '@/lib/data';
 import { searchFullText } from '@/lib/fulltext-search';
@@ -47,44 +48,64 @@ export default async function SearchPage({ searchParams }: PageProps) {
 
   return (
     <div className="animate-fade-in">
-      <h1 className="text-2xl font-serif tracking-wider mb-8">搜索</h1>
+      {/* 水墨横幅：一笔远山 + 居中搜索，营造「于虚空中寻一句经文」的意境 */}
+      <section className="relative rounded-xl overflow-hidden border border-[var(--border)] mb-8 min-h-[220px] md:min-h-[260px] flex items-center justify-center shadow-[var(--shadow-soft)]">
+        <Image
+          src="/images/site/search-ink.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover opacity-80"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--bg)]/80 via-[var(--bg)]/30 to-transparent" />
+        <div className="relative z-10 w-full max-w-xl px-6 py-10 text-center">
+          <h1 className="text-2xl md:text-3xl font-serif tracking-[0.3em] [text-indent:0.3em] mb-6 text-[var(--text)] [text-shadow:0_0_14px_rgba(247,244,236,0.95),0_1px_6px_rgba(247,244,236,0.9)]">
+            尋 經 問 典
+          </h1>
 
-      <form action="/search" method="get" className="mb-4">
-        <input type="hidden" name="mode" value={mode} />
-        <div className="relative">
-          <input
-            type="text"
-            name="q"
-            defaultValue={query}
-            placeholder={mode === 'full' ? '搜索经文正文内容…' : '输入经文名称、作者或关键词…'}
-            className="w-full px-5 py-3 bg-[var(--card)] border border-[var(--border)] rounded-lg text-sm focus:outline-none focus:border-[var(--accent)] transition-colors"
-          />
-          <button type="submit" className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--muted)] hover:text-[var(--accent)] transition-colors" aria-label="搜索">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
-            </svg>
-          </button>
+          <form action="/search" method="get">
+            <input type="hidden" name="mode" value={mode} />
+            <div className="relative group">
+              <input
+                type="text"
+                name="q"
+                defaultValue={query}
+                placeholder={mode === 'full' ? '搜索经文正文内容…' : '输入经文名称、作者或关键词…'}
+                className="w-full pl-6 pr-14 py-3.5 bg-[var(--card)]/95 backdrop-blur-sm border border-[var(--border)] rounded-full text-sm md:text-base font-serif focus:outline-none focus:border-[var(--accent)] focus:shadow-[0_0_0_3px_rgba(74,107,93,0.12)] transition-all shadow-[var(--shadow-soft)]"
+              />
+              <button
+                type="submit"
+                className="absolute right-2 top-1/2 -translate-y-1/2 w-9 h-9 flex items-center justify-center rounded-full bg-[var(--accent)] text-white hover:bg-[var(--accent-light)] transition-colors cursor-pointer"
+                aria-label="搜索"
+              >
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden>
+                  <circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" />
+                </svg>
+              </button>
+            </div>
+          </form>
+
+          {/* 模式切换：URL 驱动，可分享 */}
+          <div className="flex justify-center gap-2 mt-5 text-sm" role="tablist">
+            {([['meta', '書名搜索'], ['full', '全文搜索']] as const).map(([m, label]) => (
+              <Link
+                key={m}
+                href={`?q=${encodeURIComponent(query)}&mode=${m}`}
+                role="tab"
+                aria-selected={mode === m}
+                className={`px-4 py-1.5 rounded-full border transition-colors cursor-pointer ${
+                  mode === m
+                    ? 'border-[var(--accent)] bg-[var(--accent)] text-white'
+                    : 'border-[var(--border)] bg-[var(--card)]/80 text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent-light)]'
+                }`}
+              >
+                {label}
+              </Link>
+            ))}
+          </div>
         </div>
-      </form>
-
-      {/* 模式切换：URL 驱动，可分享 */}
-      <div className="flex gap-1 mb-6 text-sm" role="tablist">
-        {([['meta', '书名搜索'], ['full', '全文搜索']] as const).map(([m, label]) => (
-          <Link
-            key={m}
-            href={`?q=${encodeURIComponent(query)}&mode=${m}`}
-            role="tab"
-            aria-selected={mode === m}
-            className={`px-4 py-1.5 rounded-full border transition-colors ${
-              mode === m
-                ? 'border-[var(--accent)] text-[var(--accent)]'
-                : 'border-[var(--border)] text-[var(--muted)] hover:text-[var(--text)]'
-            }`}
-          >
-            {label}
-          </Link>
-        ))}
-      </div>
+      </section>
 
       {query && (
         <p className="text-sm text-[var(--muted)] mb-6">
@@ -159,7 +180,20 @@ export default async function SearchPage({ searchParams }: PageProps) {
       )}
 
       {!query && (
-        <p className="text-center text-[var(--muted)] py-12">请输入搜索关键词</p>
+        <div className="text-center py-10">
+          <p className="text-sm text-[var(--muted)] mb-5">不知從何讀起？可從這些經典開始：</p>
+          <div className="flex flex-wrap justify-center gap-2 max-w-lg mx-auto">
+            {['道德經', '清靜經', '陰符經', '黃庭經', '悟真篇', '坐忘論'].map(t => (
+              <Link
+                key={t}
+                href={`?q=${encodeURIComponent(t)}&mode=${mode}`}
+                className="px-4 py-1.5 text-sm font-serif bg-[var(--card)] border border-[var(--border)] rounded-full text-[var(--text-secondary)] hover:text-[var(--accent)] hover:border-[var(--accent-light)] transition-colors cursor-pointer"
+              >
+                {t}
+              </Link>
+            ))}
+          </div>
+        </div>
       )}
 
       {totalPages > 1 && (

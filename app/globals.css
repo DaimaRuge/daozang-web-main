@@ -272,9 +272,83 @@ body {
   animation: fadeIn var(--duration-base) ease-out;
 }
 
+/* 分段缓入：首页各版块依次浮现，营造「徐徐展卷」的节奏 */
+@keyframes riseIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-rise {
+  animation: riseIn 600ms ease-out both;
+}
+.animate-rise-delay-1 { animation-delay: 120ms; }
+.animate-rise-delay-2 { animation-delay: 240ms; }
+.animate-rise-delay-3 { animation-delay: 360ms; }
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-in { animation: none; }
+  .animate-rise { animation: none; }
   * { transition-duration: 0.01ms !important; }
+}
+
+/* ============================================================
+   东方装饰元素：印章、竖排题字、水墨分隔。
+   原则：小面积、克制点缀，不做大面积仿古纹理。
+   ============================================================ */
+
+/* 朱砂印章：方形描边 + 篆意文字，用于标题旁的点睛 */
+.seal-stamp {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2.1em;
+  height: 2.1em;
+  padding: 0.2em;
+  color: #fdfbf5;
+  background: var(--cinnabar);
+  border-radius: 0.15em;
+  font-family: var(--font-serif-cn);
+  font-weight: 600;
+  line-height: 1.1;
+  letter-spacing: 0;
+  text-align: center;
+  box-shadow: 0 1px 4px rgba(168, 63, 57, 0.35);
+  user-select: none;
+}
+
+/* 竖排题字：writing-mode 竖排，用于 hero / 版块侧饰 */
+.vertical-text {
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  letter-spacing: 0.5em;
+  user-select: none;
+}
+
+/* 水墨分隔：居中细线 + 中央菱形，替代生硬的 <hr> */
+.ink-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin: 0 auto;
+  color: var(--muted);
+}
+.ink-divider::before,
+.ink-divider::after {
+  content: '';
+  height: 1px;
+  width: min(96px, 20vw);
+  background: linear-gradient(to var(--divider-dir, right), transparent, var(--border));
+}
+.ink-divider::before { --divider-dir: right; }
+.ink-divider::after { --divider-dir: left; }
+
+/* 版块标题：serif + 宽字距 + 上下留白，统一首页节奏 */
+.section-title {
+  font-family: var(--font-serif-cn);
+  letter-spacing: 0.3em;
+  text-indent: 0.3em; /* 抵消末字符字距，实现视觉居中 */
+  color: var(--text);
 }
 
 /* 键盘导航可见焦点（无障碍） */

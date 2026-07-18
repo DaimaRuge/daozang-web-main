@@ -169,12 +169,19 @@ export const musicActions = {
 
 export const globalAudioRef: { current: HTMLAudioElement | null } = { current: null };
 
+/** SSR 快照必须是稳定引用，否则 useSyncExternalStore 会无限重渲染 */
+const SERVER_MUSIC_SNAPSHOT: MusicRuntimeState = {
+  ...DEFAULT_MUSIC_PLAYER,
+  playing: false,
+  barVisible: false,
+};
+
+function getServerMusicSnapshot(): MusicRuntimeState {
+  return SERVER_MUSIC_SNAPSHOT;
+}
+
 export function useMusicPlayer() {
-  const state = useSyncExternalStore(subscribeMusic, getMusicSnapshot, () => ({
-    ...DEFAULT_MUSIC_PLAYER,
-    playing: false,
-    barVisible: false,
-  }));
+  const state = useSyncExternalStore(subscribeMusic, getMusicSnapshot, getServerMusicSnapshot);
 
   return {
     state,

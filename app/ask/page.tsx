@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import Image from 'next/image';
 import Link from 'next/link';
 import { AgentMessage, Citation, ReadingContext, createDefaultContext } from '@/lib/agent/context';
 import { consumeAskContext } from '@/lib/ask-context';
@@ -19,6 +20,18 @@ import { consumeAgentSse } from '@/lib/agent/sse-client';
 
 interface ChatMessage extends AgentMessage {
   citations?: Citation[];
+}
+
+/** 仙人头像：问道页的「答者」形象，所有 AI 回答旁统一出现 */
+function SageAvatar({ size = 40 }: { size?: number }) {
+  return (
+    <span
+      className="relative shrink-0 rounded-full overflow-hidden border border-[var(--border)] shadow-[var(--shadow-soft)] bg-[var(--card)]"
+      style={{ width: size, height: size }}
+    >
+      <Image src="/images/site/sage.jpg" alt="仙风道骨的老者" fill sizes={`${size}px`} className="object-cover" />
+    </span>
+  );
 }
 
 const SUGGESTED_QUESTIONS = [
@@ -154,7 +167,9 @@ export default function AskPage() {
   if (aiConfigured === false) {
     return (
       <div className="animate-fade-in text-center py-20">
-        <h1 className="text-2xl font-serif tracking-wider mb-4">智能问道</h1>
+        <div className="flex justify-center mb-6"><SageAvatar size={72} /></div>
+        <h1 className="text-2xl font-serif tracking-wider mb-4">問道</h1>
+        <p className="text-sm text-[var(--text-secondary)] font-serif mb-3">山中無曆日，道人暫未應門。</p>
         <p className="text-sm text-[var(--muted)] max-w-md mx-auto leading-relaxed">
           AI 问答服务尚未开通。模型密钥仅由站长在服务端配置，浏览器端不提供填钥入口，以免泄露。
         </p>
@@ -176,11 +191,29 @@ DZ_LLM_MODEL_FAST=deepseek-v4-flash`}</pre>
 
   return (
     <div className="animate-fade-in flex flex-col min-h-[70vh]">
+      {/* 松下问道横幅：老者与鹤，确立「向智者请教」的对话情境 */}
+      <section className="relative rounded-xl overflow-hidden border border-[var(--border)] mb-6 min-h-[160px] md:min-h-[200px] shadow-[var(--shadow-soft)]">
+        <Image
+          src="/images/site/ask-banner.jpg"
+          alt="松下问道：仙风道骨的老者与鹤"
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover object-[center_35%]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-r from-[var(--bg)]/85 via-[var(--bg)]/40 to-transparent" />
+        <div className="relative z-10 h-full flex flex-col justify-center px-6 md:px-10 py-8">
+          <h1 className="text-2xl md:text-3xl font-serif tracking-[0.3em] text-[var(--text)] mb-2">問 道</h1>
+          <p className="text-sm text-[var(--text-secondary)] font-serif tracking-wider max-w-sm">
+            松風入座，鶴影在旁。道友有惑，但問無妨。
+          </p>
+        </div>
+      </section>
+
       <header className="mb-6">
-        <h1 className="text-2xl font-serif tracking-wider mb-2">智能问道</h1>
         <div className="flex items-center justify-between gap-3">
           <p className="text-xs text-[var(--muted)]">
-            就道藏典籍向 AI 提问。回答由 AI 生成、仅供参考，请以原文与权威注疏为准。本页最近对话会暂存在本会话中。
+            回答由 AI 生成、仅供参考，请以原文与权威注疏为准。本页最近对话会暂存在本会话中。
           </p>
           {messages.length > 0 && (
             <button
@@ -189,7 +222,7 @@ DZ_LLM_MODEL_FAST=deepseek-v4-flash`}</pre>
                 setMessages([]);
                 try { sessionStorage.removeItem(ASK_HISTORY_KEY); } catch { /* ignore */ }
               }}
-              className="shrink-0 text-xs text-[var(--muted)] hover:text-[var(--accent)]"
+              className="shrink-0 text-xs text-[var(--muted)] hover:text-[var(--accent)] cursor-pointer"
             >
               清空对话
             </button>
@@ -221,7 +254,11 @@ DZ_LLM_MODEL_FAST=deepseek-v4-flash`}</pre>
       <div className="flex-1 space-y-4 mb-6">
         {messages.length === 0 && aiConfigured && (
           <div className="py-8">
-            <p className="text-sm text-[var(--muted)] text-center mb-4">可以从这些问题开始：</p>
+            <div className="flex justify-center mb-4"><SageAvatar size={64} /></div>
+            <p className="text-sm text-[var(--text-secondary)] font-serif text-center mb-1">
+              「道友遠來，想必心有所問。」
+            </p>
+            <p className="text-xs text-[var(--muted)] text-center mb-6">可以从这些问题开始：</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 max-w-xl mx-auto">
               {/* 带阅读上下文时优先给出针对当前书的问题建议 */}
               {(reading?.bookTitle
@@ -245,16 +282,17 @@ DZ_LLM_MODEL_FAST=deepseek-v4-flash`}</pre>
         )}
 
         {messages.map((m, i) => (
-          <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
+          <div key={i} className={m.role === 'user' ? 'flex justify-end' : 'flex justify-start items-start gap-3'}>
+            {m.role === 'assistant' && <SageAvatar />}
             <div
               className={`max-w-[85%] rounded-lg px-4 py-3 text-sm leading-relaxed ${
                 m.role === 'user'
-                  ? 'bg-[var(--accent)] text-white'
-                  : 'bg-[var(--card)] border border-[var(--border)]'
+                  ? 'bg-[var(--accent)] text-white rounded-br-sm'
+                  : 'bg-[var(--card)] border border-[var(--border)] rounded-tl-sm shadow-[var(--shadow-soft)]'
               }`}
             >
               {m.role === 'assistant' && (
-                <p className="text-xs text-[var(--cinnabar)] mb-1.5">AI 回答 · 仅供参考</p>
+                <p className="text-xs text-[var(--cinnabar)] mb-1.5 tracking-wider">道人答曰 · AI 生成，仅供参考</p>
               )}
               <div className="whitespace-pre-wrap">{m.content}</div>
 
@@ -278,11 +316,15 @@ DZ_LLM_MODEL_FAST=deepseek-v4-flash`}</pre>
         ))}
 
         {loading && (
-          <div className="flex justify-start" aria-live="polite" aria-label="回答生成中">
-            <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg px-4 py-3 space-y-2 w-64">
-              {[85, 60].map((w, i) => (
-                <div key={i} className="h-3 bg-[var(--border)] rounded animate-pulse" style={{ width: `${w}%` }} />
-              ))}
+          <div className="flex justify-start items-start gap-3" aria-live="polite" aria-label="回答生成中">
+            <SageAvatar />
+            <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg rounded-tl-sm px-4 py-3 w-64">
+              <p className="text-xs text-[var(--muted)] mb-2 tracking-wider">道人捻鬚沉吟……</p>
+              <div className="space-y-2">
+                {[85, 60].map((w, i) => (
+                  <div key={i} className="h-3 bg-[var(--border)] rounded animate-pulse" style={{ width: `${w}%` }} />
+                ))}
+              </div>
             </div>
           </div>
         )}
