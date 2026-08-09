@@ -1,16 +1,18 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import MusicPlayer from '@/app/music/MusicPlayer';
 import { MUSIC_THEMES, MusicTheme, THEME_INTRO, TRACKS_BY_THEME } from '@/lib/music-catalog';
 import { getMusicPlayerState } from '@/lib/user-data';
 
 /** 道乐主题切换：五行 / 八卦 / 天干 / 时辰 / 节气 */
 export default function MusicThemes() {
-  const [theme, setTheme] = useState<MusicTheme>(() => {
-    if (typeof window === 'undefined') return 'wuxing';
-    return (getMusicPlayerState().theme as MusicTheme) || 'wuxing';
-  });
+  // 首屏固定默认主题，避免 useState 初始化读 localStorage 造成 hydration mismatch
+  const [theme, setTheme] = useState<MusicTheme>('wuxing');
+  useEffect(() => {
+    const saved = getMusicPlayerState().theme as MusicTheme;
+    if (saved && TRACKS_BY_THEME[saved]) setTheme(saved);
+  }, []);
   const tracks = TRACKS_BY_THEME[theme];
 
   return (

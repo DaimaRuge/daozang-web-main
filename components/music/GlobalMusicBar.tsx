@@ -8,7 +8,8 @@ export default function GlobalMusicBar({ audioRef }: { audioRef: RefObject<HTMLA
   const { state, track } = useMusicPlayer();
   const audio = () => audioRef.current ?? undefined;
 
-  if (!state.backgroundEnabled || !track) return null;
+  // 与服务端首屏一致：仅在水合后（barVisible / trackId 来自 snapshot）才挂载底栏
+  if (!state.backgroundEnabled || !state.trackId || !track) return null;
 
   const togglePlay = () => {
     if (state.playing) musicActions.pause(audio());
