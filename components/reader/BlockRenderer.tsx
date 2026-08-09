@@ -26,21 +26,45 @@ export default function BlockRenderer({
   showEditorNotes,
   footnoteIndex,
   onFootnoteNavigate,
+  annotationCounts,
+  onAnnotationClick,
 }: {
   blocks: ContentBlock[];
   showEditorNotes: boolean;
   footnoteIndex?: FootnoteIndex;
   onFootnoteNavigate?: (targetBlockId: string) => void;
+  /** 各内容块的公开旁注数量，用于行末徽章 */
+  annotationCounts?: Record<string, number>;
+  /** 点击行末旁注徽章：展开该块的旁注（移动端底部抽屉 / 桌面定位） */
+  onAnnotationClick?: (blockId: string) => void;
 }) {
-  /** 含 #N 的文本统一走 InlineText，标题/正文/注疏均适用 */
-  const renderText = (block: ContentBlock, content: string) => (
-    <InlineText
-      content={content}
-      blockId={block.id}
-      footnoteIndex={footnoteIndex}
-      onFootnoteNavigate={onFootnoteNavigate}
-    />
-  );
+  /** 含 #N 的文本统一走 InlineText，标题/正文/注疏均适用；行末附旁注徽章 */
+  const renderText = (block: ContentBlock, content: string) => {
+    const count = annotationCounts?.[block.id] ?? 0;
+    return (
+      <>
+        <InlineText
+          content={content}
+          blockId={block.id}
+          footnoteIndex={footnoteIndex}
+          onFootnoteNavigate={onFootnoteNavigate}
+        />
+        {count > 0 && (
+          <button
+            type="button"
+            className="anno-badge"
+            onClick={e => {
+              e.stopPropagation();
+              onAnnotationClick?.(block.id);
+            }}
+            aria-label={`查看 ${count} 条读者旁注`}
+          >
+            {count}
+          </button>
+        )}
+      </>
+    );
+  };
 
   /** 校勘脚注条目：弱化于原文、强于裸段落，编号徽章 + 条目正文 */
   const renderFootnoteDef = (block: ContentBlock) => {

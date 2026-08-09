@@ -69,6 +69,41 @@ function migrate(database: Database.Database): void {
 
     CREATE UNIQUE INDEX IF NOT EXISTS idx_illustrations_book_block
       ON article_illustrations(book_id, block_id, type);
+
+    -- 公开旁注：读者主动「公开分享」的划词笔记，锚定到具体内容块。
+    -- 私有笔记仍只存浏览器 localStorage，不入此表。
+    CREATE TABLE IF NOT EXISTS annotations (
+      id TEXT PRIMARY KEY,
+      book_id TEXT NOT NULL,
+      block_id TEXT NOT NULL,
+      quote TEXT NOT NULL,
+      char_start INTEGER,
+      char_end INTEGER,
+      body TEXT NOT NULL,
+      author_user_id TEXT NOT NULL,
+      author_name TEXT,
+      status TEXT NOT NULL DEFAULT 'approved',
+      report_count INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      updated_at INTEGER NOT NULL,
+      FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_annotations_book ON annotations(book_id, status);
+
+    -- 全文评论：篇级讨论，parent_id 预留将来盖楼
+    CREATE TABLE IF NOT EXISTS comments (
+      id TEXT PRIMARY KEY,
+      book_id TEXT NOT NULL,
+      parent_id TEXT,
+      body TEXT NOT NULL,
+      author_user_id TEXT NOT NULL,
+      author_name TEXT,
+      status TEXT NOT NULL DEFAULT 'approved',
+      report_count INTEGER NOT NULL DEFAULT 0,
+      created_at INTEGER NOT NULL,
+      FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_comments_book ON comments(book_id, status);
   `);
 }
 
@@ -257,4 +292,143 @@ export function updateIllustrationJob(
   }
   values.push(id);
   getDb().prepare(`UPDATE article_illustrations SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+}
+
+// ---------- 公开旁注 ----------
+
+export interface DbAnnotation {
+  id: string;
+  book_id: string;
+  block_id: string;
+  quote: string;
+  char_start: number | null;
+  char_end: number | null;
+  body: string;
+  author_user_id: string;
+  author_name: string | null;
+  status: string;
+  report_count: number;
+  created_at: number;
+  updated_at: number;
+}
+
+export function createAnnotation(input: {
+  bookId: string;
+  blockId: string;
+  quote: string;
+  charStart?: number | null;
+  charEnd?: number | null;
+  body: string;
+  authorUserId: string;
+  authorName?: string | null;
+}): DbAnnotation {
+  const id = `an_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const now = Date.now();
+  getDb()
+    .prepare(`
+      INSERT INTO annotations
+        (id, book_id, block_id, quote, char_start, char_end, body,
+         author_user_id, author_name, status, report_count, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', 0, ?, ?)
+    `)
+    .run(
+      id,
+      input.bookId,
+      input.blockId,
+      input.quote,
+      input.charStart ?? null,
+      input.charEnd ?? null,
+      input.body,
+      input.authorUserId,
+      input.authorName ?? null,
+      now,
+      now,
+    );
+  return getDb().prepare('SELECT * FROM annotations WHERE id = ?').get(id) as DbAnnotation;
+}
+
+/** 拉取一本书的公开旁注（默认仅 approved） */
+export function getAnnotationsByBook(bookId: string): DbAnnotation[] {
+  return getDb()
+    .prepare(`SELECT * FROM annotations WHERE book_id = ? AND status = 'approved' ORDER BY created_at ASC`)
+    .all(bookId) as DbAnnotation[];
+}
+
+/** 作者删除自己的旁注 */
+export function deleteAnnotation(id: string, authorUserId: string): boolean {
+  const res = getDb()
+    .prepare('DELETE FROM annotations WHERE id = ? AND author_user_id = ?')
+    .run(id, authorUserId);
+  return res.changes > 0;
+}
+
+// ---------- 全文评论 ----------
+
+export interface DbComment {
+  id: string;
+  book_id: string;
+  parent_id: string | null;
+  body: string;
+  author_user_id: string;
+  author_name: string | null;
+  status: string;
+  report_count: number;
+  created_at: number;
+}
+
+export function createComment(input: {
+  bookId: string;
+  body: string;
+  authorUserId: string;
+  authorName?: string | null;
+  parentId?: string | null;
+}): DbComment {
+  const id = `cm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+  const now = Date.now();
+  getDb()
+    .prepare(`
+      INSERT INTO comments
+        (id, book_id, parent_id, body, author_user_id, author_name, status, report_count, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, 'approved', 0, ?)
+    `)
+    .run(id, input.bookId, input.parentId ?? null, input.body, input.authorUserId, input.authorName ?? null, now);
+  return getDb().prepare('SELECT * FROM comments WHERE id = ?').get(id) as DbComment;
+}
+
+export function getCommentsByBook(bookId: string): DbComment[] {
+  return getDb()
+    .prepare(`SELECT * FROM comments WHERE book_id = ? AND status = 'approved' ORDER BY created_at DESC`)
+    .all(bookId) as DbComment[];
+}
+
+export function deleteComment(id: string, authorUserId: string): boolean {
+  const res = getDb()
+    .prepare('DELETE FROM comments WHERE id = ? AND author_user_id = ?')
+    .run(id, authorUserId);
+  return res.changes > 0;
+}
+
+/** 计每用户当日发布数：限流用 */
+export function countUserContributionsToday(authorUserId: string): number {
+  const since = Date.now() - 86400000;
+  const a = getDb()
+    .prepare('SELECT COUNT(*) AS c FROM annotations WHERE author_user_id = ? AND created_at > ?')
+    .get(authorUserId, since) as { c: number };
+  const c = getDb()
+    .prepare('SELECT COUNT(*) AS c FROM comments WHERE author_user_id = ? AND created_at > ?')
+    .get(authorUserId, since) as { c: number };
+  return a.c + c.c;
+}
+
+// ---------- 举报 ----------
+
+/** 举报内容：累加计数，达阈值自动隐藏待人工复核 */
+export function reportContent(kind: 'annotation' | 'comment', id: string, hideThreshold = 3): boolean {
+  const table = kind === 'annotation' ? 'annotations' : 'comments';
+  const res = getDb()
+    .prepare(`UPDATE ${table} SET report_count = report_count + 1,
+              status = CASE WHEN report_count + 1 >= ? THEN 'hidden' ELSE status END
+              WHERE id = ?`)
+    .run(hideThreshold, id);
+  return res.changes > 0;
 }

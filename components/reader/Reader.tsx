@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useSession } from 'next-auth/react';
 import { stashAskContext } from '@/lib/ask-context';
 import { ParsedBook } from '@/lib/content-schema';
 import { DaozangEntry } from '@/lib/data';
@@ -25,6 +26,16 @@ import ExplainPanel, { ExplainTool } from './ExplainPanel';
 import IllustrationPanel from './IllustrationPanel';
 import InBookSearch from './InBookSearch';
 import PageControls from './PageControls';
+import AnnotationRail from './AnnotationRail';
+import CommentSection from './CommentSection';
+import {
+  fetchAnnotations,
+  shareAnnotation,
+  reportContent as reportCommunity,
+  deleteAnnotation as deleteCommunityAnnotation,
+  relativeTime,
+  PublicAnnotation,
+} from '@/lib/community';
 import {
   paginateBlocks,
   findPageForBlockId,
@@ -171,9 +182,32 @@ export default function Reader({
   const navigateToBlockRef = useRef<(blockId: string) => void>(() => {});
 
   // ---- 划词与笔记 ----
+  const { data: session } = useSession();
+  const currentUserId = session?.user?.id;
   const [selection, setSelection] = useState<SelectionInfo | null>(null);
   const [noteSource, setNoteSource] = useState<{ text: string; blockId?: string } | null>(null);
   const [toast, setToast] = useState('');
+
+  // ---- 公开旁注（社区共读） ----
+  const [annotations, setAnnotations] = useState<PublicAnnotation[]>([]);
+  const [sheetBlockId, setSheetBlockId] = useState<string | null>(null);
+
+  const reloadAnnotations = useCallback(() => {
+    fetchAnnotations(entry.id)
+      .then(setAnnotations)
+      .catch(() => setAnnotations([]));
+  }, [entry.id]);
+
+  useEffect(() => {
+    reloadAnnotations();
+  }, [reloadAnnotations]);
+
+  /** 各块旁注数量：行末徽章用 */
+  const annotationCounts = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const a of annotations) map[a.blockId] = (map[a.blockId] ?? 0) + 1;
+    return map;
+  }, [annotations]);
 
   // ---- AI 解释 / 译文 ----
   const [aiConfigured, setAiConfigured] = useState<boolean>(aiConfiguredCache ?? false);
@@ -229,6 +263,23 @@ export default function Reader({
   const visibleBlocks = isPaged && pageMeta
     ? parsed.blocks.slice(pageMeta.startBlockIndex, pageMeta.endBlockIndex + 1)
     : parsed.blocks;
+
+  /** 当前页/视图内的旁注（右栏与标记只处理可见块） */
+  const visibleBlockIds = useMemo(() => new Set(visibleBlocks.map(b => b.id)), [visibleBlocks]);
+  const visibleAnnotations = useMemo(
+    () => annotations.filter(a => visibleBlockIds.has(a.blockId)),
+    [annotations, visibleBlockIds],
+  );
+  const sheetAnnotations = sheetBlockId ? annotations.filter(a => a.blockId === sheetBlockId) : [];
+
+  /** 给有公开旁注的可见块加低调标记（左侧短线），翻页/旁注变化时刷新 */
+  useEffect(() => {
+    const marked = visibleAnnotations.map(a => a.blockId);
+    for (const id of marked) document.getElementById(id)?.classList.add('block-annotated');
+    return () => {
+      for (const id of marked) document.getElementById(id)?.classList.remove('block-annotated');
+    };
+  }, [visibleAnnotations, currentPage]);
 
   /** 恢复上次阅读页码（URL ?page= 优先于 localStorage） */
   useEffect(() => {
@@ -575,8 +626,9 @@ export default function Reader({
     setSelection(null);
   };
 
-  const handleSaveNote = (noteText: string) => {
+  const handleSaveNote = (noteText: string, share: boolean) => {
     if (!noteSource) return;
+    // 私有笔记始终本地留存
     addNote({
       bookId: entry.id,
       bookTitle: entry.title,
@@ -585,8 +637,46 @@ export default function Reader({
       noteText,
       tags: [],
     });
+    const src = noteSource;
     setNoteSource(null);
-    showToast('笔记已保存');
+    // 勾选「公开分享」且能定位到块时，额外落库为公开旁注
+    if (share && currentUserId && src.blockId) {
+      shareAnnotation({
+        bookId: entry.id,
+        blockId: src.blockId,
+        quote: src.text,
+        body: noteText,
+      })
+        .then(created => {
+          setAnnotations(prev => [...prev, created]);
+          showToast('笔记已保存并公开分享');
+        })
+        .catch(e => showToast(e instanceof Error ? e.message : '公开分享失败'));
+    } else if (share && !src.blockId) {
+      showToast('笔记已保存（该选段无法定位，未公开）');
+    } else {
+      showToast('笔记已保存');
+    }
+    trackEvent('note_create', { bookId: entry.id, shared: share });
+  };
+
+  const handleReportAnnotation = async (id: string) => {
+    try {
+      await reportCommunity('annotation', id);
+      showToast('已举报，感谢反馈');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : '举报失败');
+    }
+  };
+
+  const handleDeleteAnnotation = async (id: string) => {
+    try {
+      await deleteCommunityAnnotation(id);
+      setAnnotations(prev => prev.filter(a => a.id !== id));
+      showToast('已删除');
+    } catch (e) {
+      showToast(e instanceof Error ? e.message : '删除失败');
+    }
   };
 
   const handleCopyAll = async () => {
@@ -766,6 +856,8 @@ export default function Reader({
               showEditorNotes={settings.showEditorNotes}
               footnoteIndex={footnoteIndex}
               onFootnoteNavigate={navigateToBlock}
+              annotationCounts={annotationCounts}
+              onAnnotationClick={setSheetBlockId}
             />
           </article>
 
@@ -791,6 +883,9 @@ export default function Reader({
             />
           )}
 
+          {/* 全文评论区：篇级讨论，放正文之后 */}
+          <CommentSection bookId={entry.id} onToast={showToast} />
+
           {/* 上一篇 / 下一篇：服务端注入，无需客户端再请求 */}
           <nav className="flex justify-between items-center mt-12 pt-6 border-t border-[var(--border)]" aria-label="相邻典籍">
             {prev ? (
@@ -811,6 +906,16 @@ export default function Reader({
             本文本仅供学术研究用途，版权归原作者及相关机构所有。
           </div>
         </div>
+
+        {/* 桌面右侧读者旁注栏（marginalia）：与原文块纵向对齐 */}
+        <AnnotationRail
+          annotations={visibleAnnotations}
+          articleRef={articleRef}
+          recomputeToken={`${currentPage}-${settings.fontSize}-${settings.lineHeight}-${settings.width}-${visibleAnnotations.length}`}
+          currentUserId={currentUserId}
+          onChanged={reloadAnnotations}
+          onToast={showToast}
+        />
       </div>
 
       {/* 移动端底部工具栏：目录 / 设置 / 回顶部 */}
@@ -852,7 +957,44 @@ export default function Reader({
           sourceText={noteSource.text}
           onSave={handleSaveNote}
           onClose={() => setNoteSource(null)}
+          canShare={!!currentUserId && !!noteSource.blockId}
         />
+      )}
+
+      {/* 旁注详情抽屉：点击行末徽章展开该段的读者旁注（移动端为主，桌面亦可用） */}
+      {sheetBlockId && (
+        <div className="fixed inset-0 z-50 bg-black/30" onClick={() => setSheetBlockId(null)}>
+          <div
+            className="absolute bottom-0 left-0 right-0 max-h-[70vh] overflow-y-auto bg-[var(--card)] rounded-t-xl p-5 animate-fade-in"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm font-serif tracking-wider">读者旁注 · {sheetAnnotations.length}</p>
+              <button onClick={() => setSheetBlockId(null)} className="text-[var(--muted)] hover:text-[var(--text)]" aria-label="关闭">✕</button>
+            </div>
+            <ul className="space-y-4">
+              {sheetAnnotations.map(a => {
+                const isOwner = currentUserId && a.authorUserId === currentUserId;
+                return (
+                  <li key={a.id} className="border-b border-[var(--border)] pb-4 last:border-0">
+                    <blockquote className="text-xs text-[var(--muted)] border-l-2 border-[var(--accent)] pl-2 mb-2">
+                      「{a.quote.slice(0, 60)}{a.quote.length > 60 ? '…' : ''}」
+                    </blockquote>
+                    <p className="text-sm text-[var(--text)] leading-relaxed whitespace-pre-wrap break-words">{a.body}</p>
+                    <div className="flex items-center justify-between mt-2 text-[10px] text-[var(--muted)]">
+                      <span>{a.authorName} · {relativeTime(a.createdAt)}</span>
+                      {isOwner ? (
+                        <button onClick={() => handleDeleteAnnotation(a.id)} className="hover:text-[var(--cinnabar)]">删除</button>
+                      ) : (
+                        <button onClick={() => handleReportAnnotation(a.id)} className="hover:text-[var(--cinnabar)]">举报</button>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </div>
       )}
 
       {explainSource && explainReading && (

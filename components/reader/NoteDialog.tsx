@@ -13,12 +13,16 @@ export default function NoteDialog({
   sourceText,
   onSave,
   onClose,
+  canShare = false,
 }: {
   sourceText: string;
-  onSave: (noteText: string) => void;
+  onSave: (noteText: string, share: boolean) => void;
   onClose: () => void;
+  /** 是否允许「公开分享」（需已登录）。未登录时呈提示而非可勾选 */
+  canShare?: boolean;
 }) {
   const [text, setText] = useState('');
+  const [share, setShare] = useState(false);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/30" onClick={onClose}>
@@ -44,6 +48,25 @@ export default function NoteDialog({
           className="w-full text-sm bg-[var(--bg)] border border-[var(--border)] rounded p-3 focus:outline-none focus:border-[var(--accent)] transition-colors resize-none"
         />
 
+        {/* 公开分享：默认关闭，勾选后该条会公开展示给其他读者（私有笔记始终本地留存） */}
+        <label className="flex items-start gap-2 mt-3 text-xs cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={canShare && share}
+            disabled={!canShare}
+            onChange={e => setShare(e.target.checked)}
+            className="mt-0.5 accent-[var(--accent)] disabled:opacity-40"
+          />
+          <span className={canShare ? 'text-[var(--text-secondary)]' : 'text-[var(--muted)]'}>
+            公开分享给其他读者
+            {canShare ? (
+              <span className="block text-[var(--muted)] mt-0.5">分享后此条将署名展示在原文旁，其他人可见。</span>
+            ) : (
+              <span className="block text-[var(--muted)] mt-0.5">登录后可将笔记公开分享给其他读者。</span>
+            )}
+          </span>
+        </label>
+
         <div className="flex justify-end gap-2 mt-3">
           <button
             onClick={onClose}
@@ -52,11 +75,11 @@ export default function NoteDialog({
             取消
           </button>
           <button
-            onClick={() => text.trim() && onSave(text.trim())}
+            onClick={() => text.trim() && onSave(text.trim(), canShare && share)}
             disabled={!text.trim()}
             className="px-4 py-1.5 text-xs rounded bg-[var(--accent)] text-white hover:opacity-90 transition-opacity disabled:opacity-40"
           >
-            保存
+            {canShare && share ? '保存并分享' : '保存'}
           </button>
         </div>
       </div>

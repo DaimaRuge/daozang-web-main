@@ -226,6 +226,72 @@ body {
   transition: background var(--duration-base) ease-out;
 }
 
+/* ============================================================
+   读者旁注 / 评论（社区共读）
+   ============================================================ */
+
+/* 有公开旁注的正文块：左侧极淡短线，克制不抢原文 */
+.reading-area .block-annotated {
+  box-shadow: -0.6em 0 0 -0.5em color-mix(in srgb, var(--accent) 55%, transparent);
+  transition: box-shadow var(--duration-base) ease-out;
+}
+
+/* 旁注卡片 hover 时联动高亮对应原文块 */
+.reading-area .anno-target {
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
+  border-radius: var(--radius);
+}
+
+/* 行末旁注徽章：小圆点数字，朱砂点缀 */
+.reading-area .anno-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.15em;
+  height: 1.15em;
+  margin-inline-start: 0.35em;
+  padding: 0 0.3em;
+  border-radius: 999px;
+  font-size: 0.62em;
+  line-height: 1;
+  vertical-align: super;
+  color: var(--cinnabar);
+  background: color-mix(in srgb, var(--cinnabar) 10%, var(--card));
+  border: 1px solid color-mix(in srgb, var(--cinnabar) 30%, transparent);
+  cursor: pointer;
+  transition: background var(--duration-base) ease-out;
+}
+.reading-area .anno-badge:hover {
+  background: color-mix(in srgb, var(--cinnabar) 20%, var(--card));
+}
+
+/* 右侧旁注卡片 */
+.anno-card {
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--card) 92%, transparent);
+  font-size: 0.75rem;
+  line-height: 1.6;
+  transition: border-color var(--duration-base) ease-out, box-shadow var(--duration-base) ease-out;
+}
+.anno-card:hover {
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--border));
+  box-shadow: var(--shadow-soft);
+}
+.anno-card-quote {
+  color: var(--muted);
+  font-style: italic;
+  margin-bottom: 0.35rem;
+  border-left: 2px solid var(--accent-light);
+  padding-left: 0.4rem;
+}
+.anno-card-body {
+  color: var(--text-secondary);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
 .reading-area .block-separator {
   border: none;
   border-top: 1px solid var(--border);

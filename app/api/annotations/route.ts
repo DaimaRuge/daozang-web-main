@@ -1,0 +1,106 @@
+import { NextResponse } from 'next/server';
+import { auth } from '@/auth';
+import {
+  createAnnotation,
+  getAnnotationsByBook,
+  deleteAnnotation,
+  countUserContributionsToday,
+} from '@/lib/db';
+import { UGC_LIMITS, sanitizeUgcText } from '@/lib/ugc';
+
+/**
+ * 公开旁注 API。
+ * - GET：任何人可读某书的 approved 旁注（客户端拉取，不阻塞 SSR）。
+ * - POST：登录用户把「公开分享」的划词笔记落库。
+ * - DELETE：作者删除自己的旁注。
+ */
+
+export async function GET(req: Request) {
+  const bookId = new URL(req.url).searchParams.get('bookId');
+  if (!bookId) {
+    return NextResponse.json({ error: 'bookId required' }, { status: 400 });
+  }
+  const rows = getAnnotationsByBook(bookId);
+  const annotations = rows.map(r => ({
+    id: r.id,
+    blockId: r.block_id,
+    quote: r.quote,
+    charStart: r.char_start,
+    charEnd: r.char_end,
+    body: r.body,
+    authorName: r.author_name || '匿名道友',
+    authorUserId: r.author_user_id,
+    createdAt: r.created_at,
+  }));
+  return NextResponse.json({ ok: true, annotations });
+}
+
+export async function POST(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'login required' }, { status: 401 });
+  }
+
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: 'invalid json' }, { status: 400 });
+  }
+  const p = (body ?? {}) as Record<string, unknown>;
+
+  const bookId = typeof p.bookId === 'string' ? p.bookId : '';
+  const blockId = typeof p.blockId === 'string' ? p.blockId : '';
+  const quote = sanitizeUgcText(p.quote, UGC_LIMITS.quoteMaxLen);
+  const text = sanitizeUgcText(p.body, UGC_LIMITS.annotationMaxLen);
+
+  if (!bookId || !blockId || !quote || !text) {
+    return NextResponse.json({ error: 'bookId, blockId, quote, body required' }, { status: 400 });
+  }
+
+  if (countUserContributionsToday(session.user.id) >= UGC_LIMITS.dailyPerUser) {
+    return NextResponse.json({ error: '今日发布已达上限，明日再来' }, { status: 429 });
+  }
+
+  const created = createAnnotation({
+    bookId,
+    blockId,
+    quote,
+    charStart: typeof p.charStart === 'number' ? p.charStart : null,
+    charEnd: typeof p.charEnd === 'number' ? p.charEnd : null,
+    body: text,
+    authorUserId: session.user.id,
+    authorName: session.user.name ?? null,
+  });
+
+  return NextResponse.json({
+    ok: true,
+    annotation: {
+      id: created.id,
+      blockId: created.block_id,
+      quote: created.quote,
+      charStart: created.char_start,
+      charEnd: created.char_end,
+      body: created.body,
+      authorName: created.author_name || '匿名道友',
+      authorUserId: created.author_user_id,
+      createdAt: created.created_at,
+    },
+  });
+}
+
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: 'login required' }, { status: 401 });
+  }
+  const id = new URL(req.url).searchParams.get('id');
+  if (!id) {
+    return NextResponse.json({ error: 'id required' }, { status: 400 });
+  }
+  const removed = deleteAnnotation(id, session.user.id);
+  if (!removed) {
+    return NextResponse.json({ error: 'not found or not owner' }, { status: 404 });
+  }
+  return NextResponse.json({ ok: true });
+}
