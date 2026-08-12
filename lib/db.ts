@@ -14,6 +14,10 @@ export interface DbUser {
   password_hash: string;
   name: string | null;
   created_at: number;
+  // role/status/region 用 string：auth-role → auth → db，若此处引入 UserRole 会循环依赖。
+  role: string;
+  status: string;
+  region: string;
 }
 
 /** 生成带前缀的短 ID，沿用 SQLite 时代的格式，历史数据无需转换 */
@@ -42,6 +46,17 @@ export async function createUser(
     [id, email.trim().toLowerCase(), passwordHash, name?.trim() || null, Date.now()],
   );
   return row!;
+}
+
+/** 参数用 string 而非 UserRole，避免 db ↔ auth-role 循环依赖；类型收窄在调用方做。 */
+export async function updateUserRole(userId: string, role: string): Promise<boolean> {
+  const changed = await execute('UPDATE users SET role = $1 WHERE id = $2', [role, userId]);
+  return changed > 0;
+}
+
+export async function updateUserStatus(userId: string, status: string): Promise<boolean> {
+  const changed = await execute('UPDATE users SET status = $1 WHERE id = $2', [status, userId]);
+  return changed > 0;
 }
 
 export async function upsertReadingProgress(

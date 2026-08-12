@@ -106,4 +106,22 @@ describe('数据层（Postgres）', { skip }, () => {
     const count = await db.countUserContributionsToday(userId);
     assert.ok(count >= 1, `应至少统计到刚创建的评论，实际 ${count}`);
   });
+
+  test('新用户默认角色为 reader，可被提升为 moderator', async () => {
+    const created = await db.findUserById(userId);
+    assert.ok(created);
+    assert.equal(created.role, 'reader');
+    assert.equal(created.status, 'active');
+
+    assert.equal(await db.updateUserRole(userId, 'moderator'), true);
+    const updated = await db.findUserById(userId);
+    assert.equal(updated?.role, 'moderator');
+  });
+
+  test('可以封禁用户', async () => {
+    assert.equal(await db.updateUserStatus(userId, 'banned'), true);
+    assert.equal((await db.findUserById(userId))?.status, 'banned');
+    // 复原，避免影响同一 describe 内其他断言
+    await db.updateUserStatus(userId, 'active');
+  });
 });

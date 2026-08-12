@@ -91,6 +91,12 @@ const STATEMENTS: string[] = [
     created_at BIGINT NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS idx_comments_book ON comments(book_id, status)`,
+
+  // 角色与状态：阶段 1 审核台的鉴权基础。
+  // region 记录用户注册所在部署，双区上线后用于数据归属判断。
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'reader'`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS region TEXT NOT NULL DEFAULT 'global'`,
 ];
 
 export async function migrate(): Promise<void> {
