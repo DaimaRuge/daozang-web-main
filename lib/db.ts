@@ -1,122 +1,12 @@
 /**
- * SQLite 数据层（服务端 only）。
+ * PostgreSQL 数据层（服务端 only）。
  *
- * P1 账号、进度同步、AI 配额、埋点、插图任务均落库于此。
- * 公益项目先用单文件 SQLite，部署时可换 Postgres（接口保持不变）。
+ * P1 账号、进度同步、AI 配额、埋点、插图任务、公开 UGC 均落库于此。
+ * 从 SQLite 迁来时刻意保持函数名与返回结构不变，只把返回值包成 Promise，
+ * 让调用方的改动收敛为「加一个 await」。
  */
 
-import fs from 'fs';
-import path from 'path';
-import Database from 'better-sqlite3';
-
-const DB_DIR = path.join(process.cwd(), 'data');
-const DB_PATH = process.env.DATABASE_URL?.startsWith('file:')
-  ? process.env.DATABASE_URL.slice(5)
-  : path.join(DB_DIR, 'daozang.db');
-
-let db: Database.Database | null = null;
-
-function migrate(database: Database.Database): void {
-  database.exec(`
-    CREATE TABLE IF NOT EXISTS users (
-      id TEXT PRIMARY KEY,
-      email TEXT NOT NULL UNIQUE COLLATE NOCASE,
-      password_hash TEXT NOT NULL,
-      name TEXT,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS reading_progress (
-      user_id TEXT NOT NULL,
-      book_id TEXT NOT NULL,
-      data_json TEXT NOT NULL,
-      updated_at INTEGER NOT NULL,
-      PRIMARY KEY (user_id, book_id),
-      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-
-    CREATE TABLE IF NOT EXISTS ai_quota (
-      quota_key TEXT NOT NULL,
-      day TEXT NOT NULL,
-      count INTEGER NOT NULL DEFAULT 0,
-      PRIMARY KEY (quota_key, day)
-    );
-
-    CREATE TABLE IF NOT EXISTS analytics_events (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      event TEXT NOT NULL,
-      user_id TEXT,
-      session_id TEXT,
-      book_id TEXT,
-      platform TEXT,
-      extra_json TEXT,
-      created_at INTEGER NOT NULL
-    );
-
-    CREATE TABLE IF NOT EXISTS article_illustrations (
-      id TEXT PRIMARY KEY,
-      book_id TEXT NOT NULL,
-      block_id TEXT NOT NULL,
-      type TEXT NOT NULL DEFAULT 'scene',
-      source_text TEXT,
-      image_url TEXT,
-      status TEXT NOT NULL DEFAULT 'pending',
-      error TEXT,
-      prompt TEXT,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL
-    );
-
-    CREATE UNIQUE INDEX IF NOT EXISTS idx_illustrations_book_block
-      ON article_illustrations(book_id, block_id, type);
-
-    -- 公开旁注：读者主动「公开分享」的划词笔记，锚定到具体内容块。
-    -- 私有笔记仍只存浏览器 localStorage，不入此表。
-    CREATE TABLE IF NOT EXISTS annotations (
-      id TEXT PRIMARY KEY,
-      book_id TEXT NOT NULL,
-      block_id TEXT NOT NULL,
-      quote TEXT NOT NULL,
-      char_start INTEGER,
-      char_end INTEGER,
-      body TEXT NOT NULL,
-      author_user_id TEXT NOT NULL,
-      author_name TEXT,
-      status TEXT NOT NULL DEFAULT 'approved',
-      report_count INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      updated_at INTEGER NOT NULL,
-      FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS idx_annotations_book ON annotations(book_id, status);
-
-    -- 全文评论：篇级讨论，parent_id 预留将来盖楼
-    CREATE TABLE IF NOT EXISTS comments (
-      id TEXT PRIMARY KEY,
-      book_id TEXT NOT NULL,
-      parent_id TEXT,
-      body TEXT NOT NULL,
-      author_user_id TEXT NOT NULL,
-      author_name TEXT,
-      status TEXT NOT NULL DEFAULT 'approved',
-      report_count INTEGER NOT NULL DEFAULT 0,
-      created_at INTEGER NOT NULL,
-      FOREIGN KEY (author_user_id) REFERENCES users(id) ON DELETE CASCADE
-    );
-    CREATE INDEX IF NOT EXISTS idx_comments_book ON comments(book_id, status);
-  `);
-}
-
-/** 获取 SQLite 连接（单例，首次调用时建表） */
-export function getDb(): Database.Database {
-  if (db) return db;
-  fs.mkdirSync(path.dirname(DB_PATH), { recursive: true });
-  db = new Database(DB_PATH);
-  db.pragma('journal_mode = WAL');
-  db.pragma('foreign_keys = ON');
-  migrate(db);
-  return db;
-}
+import { query, queryOne, execute } from '@/lib/pg';
 
 export interface DbUser {
   id: string;
@@ -126,97 +16,119 @@ export interface DbUser {
   created_at: number;
 }
 
-export function findUserByEmail(email: string): DbUser | undefined {
-  return getDb()
-    .prepare('SELECT * FROM users WHERE email = ? COLLATE NOCASE')
-    .get(email.trim().toLowerCase()) as DbUser | undefined;
+/** 生成带前缀的短 ID，沿用 SQLite 时代的格式，历史数据无需转换 */
+function newId(prefix: string): string {
+  return `${prefix}_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function findUserById(id: string): DbUser | undefined {
-  return getDb().prepare('SELECT * FROM users WHERE id = ?').get(id) as DbUser | undefined;
+export async function findUserByEmail(email: string): Promise<DbUser | undefined> {
+  // Postgres 无 COLLATE NOCASE，用 lower() 匹配 idx_users_email_lower 函数索引。
+  return queryOne<DbUser>('SELECT * FROM users WHERE lower(email) = lower($1)', [email.trim()]);
 }
 
-export function createUser(email: string, passwordHash: string, name?: string): DbUser {
-  const id = `u_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const now = Date.now();
-  getDb()
-    .prepare('INSERT INTO users (id, email, password_hash, name, created_at) VALUES (?, ?, ?, ?, ?)')
-    .run(id, email.trim().toLowerCase(), passwordHash, name?.trim() || null, now);
-  return findUserById(id)!;
+export async function findUserById(id: string): Promise<DbUser | undefined> {
+  return queryOne<DbUser>('SELECT * FROM users WHERE id = $1', [id]);
 }
 
-export function upsertReadingProgress(userId: string, bookId: string, data: Record<string, unknown>): void {
-  const now = Date.now();
-  getDb()
-    .prepare(`
-      INSERT INTO reading_progress (user_id, book_id, data_json, updated_at)
-      VALUES (?, ?, ?, ?)
-      ON CONFLICT(user_id, book_id) DO UPDATE SET
-        data_json = excluded.data_json,
-        updated_at = excluded.updated_at
-    `)
-    .run(userId, bookId, JSON.stringify(data), now);
+export async function createUser(
+  email: string,
+  passwordHash: string,
+  name?: string,
+): Promise<DbUser> {
+  const id = newId('u');
+  const row = await queryOne<DbUser>(
+    `INSERT INTO users (id, email, password_hash, name, created_at)
+     VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [id, email.trim().toLowerCase(), passwordHash, name?.trim() || null, Date.now()],
+  );
+  return row!;
 }
 
-export function getReadingProgress(userId: string, bookId?: string): Record<string, unknown>[] {
+export async function upsertReadingProgress(
+  userId: string,
+  bookId: string,
+  data: Record<string, unknown>,
+): Promise<void> {
+  await execute(
+    `INSERT INTO reading_progress (user_id, book_id, data_json, updated_at)
+     VALUES ($1, $2, $3, $4)
+     ON CONFLICT (user_id, book_id) DO UPDATE SET
+       data_json = EXCLUDED.data_json,
+       updated_at = EXCLUDED.updated_at`,
+    [userId, bookId, JSON.stringify(data), Date.now()],
+  );
+}
+
+export async function getReadingProgress(
+  userId: string,
+  bookId?: string,
+): Promise<Record<string, unknown>[]> {
   if (bookId) {
-    const row = getDb()
-      .prepare('SELECT data_json FROM reading_progress WHERE user_id = ? AND book_id = ?')
-      .get(userId, bookId) as { data_json: string } | undefined;
+    const row = await queryOne<{ data_json: string }>(
+      'SELECT data_json FROM reading_progress WHERE user_id = $1 AND book_id = $2',
+      [userId, bookId],
+    );
     return row ? [JSON.parse(row.data_json)] : [];
   }
-  const rows = getDb()
-    .prepare('SELECT data_json FROM reading_progress WHERE user_id = ? ORDER BY updated_at DESC')
-    .all(userId) as { data_json: string }[];
+  const rows = await query<{ data_json: string }>(
+    'SELECT data_json FROM reading_progress WHERE user_id = $1 ORDER BY updated_at DESC',
+    [userId],
+  );
   return rows.map(r => JSON.parse(r.data_json));
 }
 
-export function getAiQuotaCount(quotaKey: string, day: string): number {
-  const row = getDb()
-    .prepare('SELECT count FROM ai_quota WHERE quota_key = ? AND day = ?')
-    .get(quotaKey, day) as { count: number } | undefined;
+export async function getAiQuotaCount(quotaKey: string, day: string): Promise<number> {
+  const row = await queryOne<{ count: number }>(
+    'SELECT count FROM ai_quota WHERE quota_key = $1 AND day = $2',
+    [quotaKey, day],
+  );
   return row?.count ?? 0;
 }
 
-export function incrementAiQuota(quotaKey: string, day: string): number {
-  getDb()
-    .prepare(`
-      INSERT INTO ai_quota (quota_key, day, count) VALUES (?, ?, 1)
-      ON CONFLICT(quota_key, day) DO UPDATE SET count = count + 1
-    `)
-    .run(quotaKey, day);
-  return getAiQuotaCount(quotaKey, day);
+export async function incrementAiQuota(quotaKey: string, day: string): Promise<number> {
+  // RETURNING 让「自增 + 读回」一次往返完成，避免并发下读到旧值。
+  const row = await queryOne<{ count: number }>(
+    `INSERT INTO ai_quota (quota_key, day, count) VALUES ($1, $2, 1)
+     ON CONFLICT (quota_key, day) DO UPDATE SET count = ai_quota.count + 1
+     RETURNING count`,
+    [quotaKey, day],
+  );
+  return row?.count ?? 0;
 }
 
-export function insertAnalyticsEvents(
-  events: Array<{
-    event: string;
-    userId?: string;
-    sessionId?: string;
-    bookId?: string;
-    platform?: string;
-    extra?: Record<string, unknown>;
-  }>,
-): number {
-  const stmt = getDb().prepare(`
-    INSERT INTO analytics_events (event, user_id, session_id, book_id, platform, extra_json, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `);
+export interface AnalyticsEventInput {
+  event: string;
+  userId?: string;
+  sessionId?: string;
+  bookId?: string;
+  platform?: string;
+  extra?: Record<string, unknown>;
+}
+
+export async function insertAnalyticsEvents(events: AnalyticsEventInput[]): Promise<number> {
+  if (events.length === 0) return 0;
   const now = Date.now();
-  const insertMany = getDb().transaction((items: typeof events) => {
-    for (const e of items) {
-      stmt.run(
-        e.event,
-        e.userId ?? null,
-        e.sessionId ?? null,
-        e.bookId ?? null,
-        e.platform ?? null,
-        e.extra ? JSON.stringify(e.extra) : null,
-        now,
-      );
-    }
+  // 单条 INSERT 多值：埋点是批量上报，逐条往返会把延迟放大到不可接受。
+  const values: unknown[] = [];
+  const tuples = events.map((e, i) => {
+    const base = i * 7;
+    values.push(
+      e.event,
+      e.userId ?? null,
+      e.sessionId ?? null,
+      e.bookId ?? null,
+      e.platform ?? null,
+      e.extra ? JSON.stringify(e.extra) : null,
+      now,
+    );
+    return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6}, $${base + 7})`;
   });
-  insertMany(events);
+  await execute(
+    `INSERT INTO analytics_events
+       (event, user_id, session_id, book_id, platform, extra_json, created_at)
+     VALUES ${tuples.join(', ')}`,
+    values,
+  );
   return events.length;
 }
 
@@ -234,64 +146,55 @@ export interface IllustrationJob {
   updated_at: number;
 }
 
-export function createIllustrationJob(
+export async function createIllustrationJob(
   id: string,
   bookId: string,
   blockId: string,
   sourceText: string,
   type = 'scene',
-): IllustrationJob {
+): Promise<IllustrationJob> {
   const now = Date.now();
-  getDb()
-    .prepare(`
-      INSERT INTO article_illustrations
-        (id, book_id, block_id, type, source_text, status, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, 'pending', ?, ?)
-    `)
-    .run(id, bookId, blockId, type, sourceText, now, now);
-  return getIllustrationJob(id)!;
+  const row = await queryOne<IllustrationJob>(
+    `INSERT INTO article_illustrations
+       (id, book_id, block_id, type, source_text, status, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, 'pending', $6, $7) RETURNING *`,
+    [id, bookId, blockId, type, sourceText, now, now],
+  );
+  return row!;
 }
 
-export function getIllustrationJob(id: string): IllustrationJob | undefined {
-  return getDb().prepare('SELECT * FROM article_illustrations WHERE id = ?').get(id) as
-    | IllustrationJob
-    | undefined;
+export async function getIllustrationJob(id: string): Promise<IllustrationJob | undefined> {
+  return queryOne<IllustrationJob>('SELECT * FROM article_illustrations WHERE id = $1', [id]);
 }
 
-export function findIllustrationByBlock(
+export async function findIllustrationByBlock(
   bookId: string,
   blockId: string,
   type = 'scene',
-): IllustrationJob | undefined {
-  return getDb()
-    .prepare('SELECT * FROM article_illustrations WHERE book_id = ? AND block_id = ? AND type = ?')
-    .get(bookId, blockId, type) as IllustrationJob | undefined;
+): Promise<IllustrationJob | undefined> {
+  return queryOne<IllustrationJob>(
+    'SELECT * FROM article_illustrations WHERE book_id = $1 AND block_id = $2 AND type = $3',
+    [bookId, blockId, type],
+  );
 }
 
-export function updateIllustrationJob(
+export async function updateIllustrationJob(
   id: string,
   patch: Partial<Pick<IllustrationJob, 'status' | 'image_url' | 'error' | 'prompt'>>,
-): void {
-  const fields: string[] = ['updated_at = ?'];
+): Promise<void> {
+  const fields: string[] = ['updated_at = $1'];
   const values: unknown[] = [Date.now()];
-  if (patch.status !== undefined) {
-    fields.push('status = ?');
-    values.push(patch.status);
-  }
-  if (patch.image_url !== undefined) {
-    fields.push('image_url = ?');
-    values.push(patch.image_url);
-  }
-  if (patch.error !== undefined) {
-    fields.push('error = ?');
-    values.push(patch.error);
-  }
-  if (patch.prompt !== undefined) {
-    fields.push('prompt = ?');
-    values.push(patch.prompt);
+  for (const key of ['status', 'image_url', 'error', 'prompt'] as const) {
+    if (patch[key] !== undefined) {
+      values.push(patch[key]);
+      fields.push(`${key} = $${values.length}`);
+    }
   }
   values.push(id);
-  getDb().prepare(`UPDATE article_illustrations SET ${fields.join(', ')} WHERE id = ?`).run(...values);
+  await execute(
+    `UPDATE article_illustrations SET ${fields.join(', ')} WHERE id = $${values.length}`,
+    values,
+  );
 }
 
 // ---------- 公开旁注 ----------
@@ -312,7 +215,7 @@ export interface DbAnnotation {
   updated_at: number;
 }
 
-export function createAnnotation(input: {
+export async function createAnnotation(input: {
   bookId: string;
   blockId: string;
   quote: string;
@@ -321,18 +224,16 @@ export function createAnnotation(input: {
   body: string;
   authorUserId: string;
   authorName?: string | null;
-}): DbAnnotation {
-  const id = `an_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
+}): Promise<DbAnnotation> {
   const now = Date.now();
-  getDb()
-    .prepare(`
-      INSERT INTO annotations
-        (id, book_id, block_id, quote, char_start, char_end, body,
-         author_user_id, author_name, status, report_count, created_at, updated_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'approved', 0, ?, ?)
-    `)
-    .run(
-      id,
+  const row = await queryOne<DbAnnotation>(
+    `INSERT INTO annotations
+       (id, book_id, block_id, quote, char_start, char_end, body,
+        author_user_id, author_name, status, report_count, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'approved', 0, $10, $11)
+     RETURNING *`,
+    [
+      newId('an'),
       input.bookId,
       input.blockId,
       input.quote,
@@ -343,23 +244,26 @@ export function createAnnotation(input: {
       input.authorName ?? null,
       now,
       now,
-    );
-  return getDb().prepare('SELECT * FROM annotations WHERE id = ?').get(id) as DbAnnotation;
+    ],
+  );
+  return row!;
 }
 
 /** 拉取一本书的公开旁注（默认仅 approved） */
-export function getAnnotationsByBook(bookId: string): DbAnnotation[] {
-  return getDb()
-    .prepare(`SELECT * FROM annotations WHERE book_id = ? AND status = 'approved' ORDER BY created_at ASC`)
-    .all(bookId) as DbAnnotation[];
+export async function getAnnotationsByBook(bookId: string): Promise<DbAnnotation[]> {
+  return query<DbAnnotation>(
+    `SELECT * FROM annotations WHERE book_id = $1 AND status = 'approved' ORDER BY created_at ASC`,
+    [bookId],
+  );
 }
 
 /** 作者删除自己的旁注 */
-export function deleteAnnotation(id: string, authorUserId: string): boolean {
-  const res = getDb()
-    .prepare('DELETE FROM annotations WHERE id = ? AND author_user_id = ?')
-    .run(id, authorUserId);
-  return res.changes > 0;
+export async function deleteAnnotation(id: string, authorUserId: string): Promise<boolean> {
+  const changed = await execute(
+    'DELETE FROM annotations WHERE id = $1 AND author_user_id = $2',
+    [id, authorUserId],
+  );
+  return changed > 0;
 }
 
 // ---------- 全文评论 ----------
@@ -376,59 +280,74 @@ export interface DbComment {
   created_at: number;
 }
 
-export function createComment(input: {
+export async function createComment(input: {
   bookId: string;
   body: string;
   authorUserId: string;
   authorName?: string | null;
   parentId?: string | null;
-}): DbComment {
-  const id = `cm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 8)}`;
-  const now = Date.now();
-  getDb()
-    .prepare(`
-      INSERT INTO comments
-        (id, book_id, parent_id, body, author_user_id, author_name, status, report_count, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, 'approved', 0, ?)
-    `)
-    .run(id, input.bookId, input.parentId ?? null, input.body, input.authorUserId, input.authorName ?? null, now);
-  return getDb().prepare('SELECT * FROM comments WHERE id = ?').get(id) as DbComment;
+}): Promise<DbComment> {
+  const row = await queryOne<DbComment>(
+    `INSERT INTO comments
+       (id, book_id, parent_id, body, author_user_id, author_name, status, report_count, created_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'approved', 0, $7)
+     RETURNING *`,
+    [
+      newId('cm'),
+      input.bookId,
+      input.parentId ?? null,
+      input.body,
+      input.authorUserId,
+      input.authorName ?? null,
+      Date.now(),
+    ],
+  );
+  return row!;
 }
 
-export function getCommentsByBook(bookId: string): DbComment[] {
-  return getDb()
-    .prepare(`SELECT * FROM comments WHERE book_id = ? AND status = 'approved' ORDER BY created_at DESC`)
-    .all(bookId) as DbComment[];
+export async function getCommentsByBook(bookId: string): Promise<DbComment[]> {
+  return query<DbComment>(
+    `SELECT * FROM comments WHERE book_id = $1 AND status = 'approved' ORDER BY created_at DESC`,
+    [bookId],
+  );
 }
 
-export function deleteComment(id: string, authorUserId: string): boolean {
-  const res = getDb()
-    .prepare('DELETE FROM comments WHERE id = ? AND author_user_id = ?')
-    .run(id, authorUserId);
-  return res.changes > 0;
+export async function deleteComment(id: string, authorUserId: string): Promise<boolean> {
+  const changed = await execute(
+    'DELETE FROM comments WHERE id = $1 AND author_user_id = $2',
+    [id, authorUserId],
+  );
+  return changed > 0;
 }
 
 /** 计每用户当日发布数：限流用 */
-export function countUserContributionsToday(authorUserId: string): number {
+export async function countUserContributionsToday(authorUserId: string): Promise<number> {
   const since = Date.now() - 86400000;
-  const a = getDb()
-    .prepare('SELECT COUNT(*) AS c FROM annotations WHERE author_user_id = ? AND created_at > ?')
-    .get(authorUserId, since) as { c: number };
-  const c = getDb()
-    .prepare('SELECT COUNT(*) AS c FROM comments WHERE author_user_id = ? AND created_at > ?')
-    .get(authorUserId, since) as { c: number };
-  return a.c + c.c;
+  const row = await queryOne<{ c: number }>(
+    `SELECT
+       (SELECT COUNT(*) FROM annotations WHERE author_user_id = $1 AND created_at > $2)
+     + (SELECT COUNT(*) FROM comments    WHERE author_user_id = $1 AND created_at > $2) AS c`,
+    [authorUserId, since],
+  );
+  return row?.c ?? 0;
 }
 
 // ---------- 举报 ----------
 
 /** 举报内容：累加计数，达阈值自动隐藏待人工复核 */
-export function reportContent(kind: 'annotation' | 'comment', id: string, hideThreshold = 3): boolean {
+export async function reportContent(
+  kind: 'annotation' | 'comment',
+  id: string,
+  hideThreshold = 3,
+): Promise<boolean> {
+  // 表名不能参数化，用白名单映射避免拼接注入。
   const table = kind === 'annotation' ? 'annotations' : 'comments';
-  const res = getDb()
-    .prepare(`UPDATE ${table} SET report_count = report_count + 1,
-              status = CASE WHEN report_count + 1 >= ? THEN 'hidden' ELSE status END
-              WHERE id = ?`)
-    .run(hideThreshold, id);
-  return res.changes > 0;
+  const changed = await execute(
+    `UPDATE ${table}
+        SET report_count = report_count + 1,
+            status = CASE WHEN report_count + 1 >= $1 THEN 'hidden' ELSE status END
+      WHERE id = $2`,
+    [hideThreshold, id],
+  );
+  return changed > 0;
 }

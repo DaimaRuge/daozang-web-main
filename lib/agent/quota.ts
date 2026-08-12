@@ -69,7 +69,7 @@ export interface QuotaStatus {
 /** 检查配额（不扣减） */
 export async function checkAiQuota(request: Request, context: AgentContext): Promise<QuotaStatus> {
   const { key, isAuthenticated, limit } = await resolveQuotaKey(request, context);
-  const used = getAiQuotaCount(key, todayKey());
+  const used = await getAiQuotaCount(key, todayKey());
   return {
     allowed: used < limit,
     remaining: Math.max(0, limit - used),
@@ -83,7 +83,7 @@ export async function consumeAiQuota(request: Request, context: AgentContext): P
   const status = await checkAiQuota(request, context);
   if (!status.allowed) return status;
   const { key } = await resolveQuotaKey(request, context);
-  const used = incrementAiQuota(key, todayKey());
+  const used = await incrementAiQuota(key, todayKey());
   return {
     ...status,
     remaining: Math.max(0, status.limit - used),

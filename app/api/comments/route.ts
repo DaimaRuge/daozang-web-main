@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   if (!bookId) {
     return NextResponse.json({ error: 'bookId required' }, { status: 400 });
   }
-  const rows = getCommentsByBook(bookId);
+  const rows = await getCommentsByBook(bookId);
   const comments = rows.map(r => ({
     id: r.id,
     parentId: r.parent_id,
@@ -53,11 +53,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'bookId and body required' }, { status: 400 });
   }
 
-  if (countUserContributionsToday(session.user.id) >= UGC_LIMITS.dailyPerUser) {
+  if ((await countUserContributionsToday(session.user.id)) >= UGC_LIMITS.dailyPerUser) {
     return NextResponse.json({ error: '今日发布已达上限，明日再来' }, { status: 429 });
   }
 
-  const created = createComment({
+  const created = await createComment({
     bookId,
     body: text,
     authorUserId: session.user.id,
@@ -87,7 +87,7 @@ export async function DELETE(req: Request) {
   if (!id) {
     return NextResponse.json({ error: 'id required' }, { status: 400 });
   }
-  const removed = deleteComment(id, session.user.id);
+  const removed = await deleteComment(id, session.user.id);
   if (!removed) {
     return NextResponse.json({ error: 'not found or not owner' }, { status: 404 });
   }

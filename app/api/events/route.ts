@@ -65,6 +65,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'no valid events' }, { status: 400 });
   }
 
-  const stored = insertAnalyticsEvents(valid);
+  const stored = await insertAnalyticsEvents(valid);
   return NextResponse.json({ ok: true, stored });
 }

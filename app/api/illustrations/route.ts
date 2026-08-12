@@ -49,7 +49,7 @@ export async function GET(req: Request) {
   if (!jobId) {
     return NextResponse.json({ error: 'jobId required' }, { status: 400 });
   }
-  const status = getIllustrationStatus(jobId);
+  const status = await getIllustrationStatus(jobId);
   if (!status) {
     return NextResponse.json({ error: 'job not found' }, { status: 404 });
   }

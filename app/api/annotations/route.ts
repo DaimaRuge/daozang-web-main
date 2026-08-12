@@ -20,7 +20,7 @@ export async function GET(req: Request) {
   if (!bookId) {
     return NextResponse.json({ error: 'bookId required' }, { status: 400 });
   }
-  const rows = getAnnotationsByBook(bookId);
+  const rows = await getAnnotationsByBook(bookId);
   const annotations = rows.map(r => ({
     id: r.id,
     blockId: r.block_id,
@@ -58,11 +58,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'bookId, blockId, quote, body required' }, { status: 400 });
   }
 
-  if (countUserContributionsToday(session.user.id) >= UGC_LIMITS.dailyPerUser) {
+  if ((await countUserContributionsToday(session.user.id)) >= UGC_LIMITS.dailyPerUser) {
     return NextResponse.json({ error: '今日发布已达上限，明日再来' }, { status: 429 });
   }
 
-  const created = createAnnotation({
+  const created = await createAnnotation({
     bookId,
     blockId,
     quote,
@@ -98,7 +98,7 @@ export async function DELETE(req: Request) {
   if (!id) {
     return NextResponse.json({ error: 'id required' }, { status: 400 });
   }
-  const removed = deleteAnnotation(id, session.user.id);
+  const removed = await deleteAnnotation(id, session.user.id);
   if (!removed) {
     return NextResponse.json({ error: 'not found or not owner' }, { status: 404 });
   }

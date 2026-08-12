@@ -1,7 +1,7 @@
 /**
  * Auth.js 配置（NextAuth v5）。
  *
- * 凭证登录 + JWT 会话；进度与配额通过 user.id 关联 SQLite。
+ * 凭证登录 + JWT 会话；进度与配额通过 user.id 关联 Postgres。
  */
 
 import NextAuth from 'next-auth';
@@ -40,7 +40,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const password = credentials?.password as string | undefined;
         if (!email?.trim() || !password) return null;
 
-        const user = findUserByEmail(email);
+        const user = await findUserByEmail(email);
         if (!user) return null;
 
         const ok = await bcrypt.compare(password, user.password_hash);

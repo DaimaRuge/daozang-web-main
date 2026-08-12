@@ -24,7 +24,7 @@ export async function POST(req: Request) {
   let stored: 'local-only' | 'database' = 'local-only';
 
   if (session?.user?.id) {
-    upsertReadingProgress(session.user.id, p.bookId, p);
+    await upsertReadingProgress(session.user.id, p.bookId, p);
     stored = 'database';
   }
 
@@ -47,6 +47,6 @@ export async function GET(req: Request) {
   }
 
   const bookId = new URL(req.url).searchParams.get('bookId') ?? undefined;
-  const items = getReadingProgress(session.user.id, bookId);
+  const items = await getReadingProgress(session.user.id, bookId);
   return NextResponse.json({ ok: true, progress: items });
 }
