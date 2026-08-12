@@ -6,7 +6,6 @@ const nextConfig: NextConfig = {
   // Next 16.3 起 next dev 默认会往仓库根目录写 AGENTS.md / CLAUDE.md，既与上述约定形成两套并行来源、
   // 又会在每次开发时留下未跟踪文件噪声，因此在源头关闭而非交给 .gitignore 掩盖。
   agentRules: false,
-  serverExternalPackages: ['better-sqlite3'],
   outputFileTracingExcludes: {
     '*': ['./data/daozang-text/**', './data/daozang-text-utf8/**', './data/daozang-text-new/**', './data/daozang-text-orig/**'],
   },

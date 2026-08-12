@@ -9,13 +9,13 @@
     "lint": "eslint",
     "test": "tsx --test tests/*.test.ts",
     "build-index": "tsx scripts/build-index.ts",
-    "migrate": "tsx scripts/migrate-pg.ts"
+    "migrate": "tsx scripts/migrate-pg.ts",
+    "import-sqlite": "tsx scripts/import-sqlite.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1108.0",
     "@aws-sdk/s3-request-presigner": "^3.1108.0",
     "bcryptjs": "^3.0.3",
-    "better-sqlite3": "^12.11.1",
     "next": "16.3.0",
     "next-auth": "^5.0.0-beta.32",
     "opencc-js": "^1.4.1",
@@ -31,6 +31,7 @@
     "@types/pg": "^8.21.0",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "better-sqlite3": "^13.0.3",
     "eslint": "^9",
     "eslint-config-next": "16.3.0",
     "sharp": "^0.35.3",
