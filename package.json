@@ -11,6 +11,8 @@
     "build-index": "tsx scripts/build-index.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1108.0",
+    "@aws-sdk/s3-request-presigner": "^3.1108.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.11.1",
     "next": "16.3.0",
