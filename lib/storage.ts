@@ -40,9 +40,17 @@ function getClient(): S3Client {
   if (!endpoint || !accessKeyId || !secretAccessKey) {
     throw new Error('对象存储未配置：需要 DZ_S3_ENDPOINT / DZ_S3_ACCESS_KEY_ID / DZ_S3_SECRET_ACCESS_KEY');
   }
+  // R2 与本地 MinIO 都需要 path-style；虚拟主机样式会拼错 endpoint。
+  const forcePathStyle =
+    process.env.DZ_S3_FORCE_PATH_STYLE === '1' ||
+    process.env.DZ_S3_FORCE_PATH_STYLE === 'true' ||
+    /r2\.cloudflarestorage\.com/i.test(endpoint) ||
+    /localhost|127\.0\.0\.1/i.test(endpoint);
+
   return new S3Client({
     region: process.env.DZ_S3_REGION ?? 'auto',  // R2 固定用 auto
     endpoint,
+    forcePathStyle,
     credentials: { accessKeyId, secretAccessKey },
   });
 }
@@ -91,10 +99,13 @@ export async function createUploadUrl(
   contentType: string,
   expiresInSeconds = 900,
 ): Promise<string> {
+  // 预签名 Put 也带上 CacheControl，与 uploadObject 一致；
+  // 浏览器直传时须原样附带该头，否则签名对不上。
   const command = new PutObjectCommand({
     Bucket: getBucket(),
     Key: key,
     ContentType: contentType,
+    CacheControl: 'public, max-age=31536000, immutable',
   });
   return getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });
 }

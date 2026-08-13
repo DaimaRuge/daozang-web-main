@@ -1,6 +1,7 @@
 ﻿import { Metadata } from 'next';
 import Image from 'next/image';
 import Link from 'next/link';
+import { mediaUrl } from '@/lib/media-url';
 import MusicThemes from './MusicThemes';
 
 export const metadata: Metadata = {
@@ -31,7 +32,7 @@ export default function MusicPage() {
         <h2 className="text-lg font-serif tracking-wider mb-4">经文聆听 · 《道德经》第一章</h2>
         <div className="bg-[var(--card)] border border-[var(--border)] rounded-lg p-5">
           <blockquote className="text-sm font-serif leading-loose text-[var(--text-secondary)] mb-4">{DAODEJING_1}</blockquote>
-          <audio controls preload="none" src="/audio/daodejing-01.mp3" className="w-full h-10" />
+          <audio controls preload="none" src={mediaUrl('/audio/daodejing-01.mp3')} className="w-full h-10" />
           <p className="text-xs text-[var(--muted)] mt-3">
             朗读语音由 AI 合成（MiniMax speech-2.8-hd），请以
             <Link href="/search?q=%E9%81%93%E5%BE%B7%E7%BB%8F" className="text-[var(--accent)] hover:underline mx-0.5">原文</Link>

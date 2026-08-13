@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { MusicTheme, TRACKS_BY_THEME } from '@/lib/music-catalog';
+import { mediaUrl } from '@/lib/media-url';
 import {
   MusicPlayerPersist,
   DEFAULT_MUSIC_PLAYER,
@@ -86,8 +87,9 @@ export const musicActions = {
       barVisible: runtime.backgroundEnabled,
     };
     if (audio) {
+      // endsWith(track.audio) 仍成立：CDN 前缀后 URL 仍以 /audio/xx.mp3 结尾
       if (!same || !audio.src.endsWith(track.audio)) {
-        audio.src = track.audio;
+        audio.src = mediaUrl(track.audio);
         audio.currentTime = same ? runtime.currentTime : 0;
       }
       audio.loop = runtime.loop;
@@ -173,7 +175,7 @@ export const musicActions = {
     if (!runtime.trackId) return;
     const track = getCurrentTrack();
     if (!track) return;
-    audio.src = track.audio;
+    audio.src = mediaUrl(track.audio);
     audio.loop = runtime.loop;
     audio.currentTime = runtime.currentTime;
     if (runtime.playing) audio.play().catch(() => {});

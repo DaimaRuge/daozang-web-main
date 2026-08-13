@@ -5,6 +5,7 @@ import {
   isFootnoteDefinition,
   parseFootnoteDefinition,
 } from '@/lib/footnotes';
+import { mediaUrl } from '@/lib/media-url';
 import InlineText from './InlineText';
 
 /**
@@ -157,7 +158,7 @@ export default function BlockRenderer({
               <figure key={block.id} {...common} className="block-image my-6">
                 <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--card)]">
                   <Image
-                    src={block.content}
+                    src={mediaUrl(block.content)}
                     alt="科仪示意图"
                     fill
                     sizes="(max-width: 768px) 100vw, 640px"

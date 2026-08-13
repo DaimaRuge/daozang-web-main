@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Image from 'next/image';
 import { trackEvent } from '@/lib/user-data';
+import { mediaUrl } from '@/lib/media-url';
 import { MusicTheme } from '@/lib/music-catalog';
 import { musicActions, useMusicPlayer, globalAudioRef } from '@/lib/use-music-player';
 
@@ -72,7 +73,7 @@ export default function MusicPlayer({
             >
               <div className="relative aspect-square">
                 <Image
-                  src={track.image}
+                  src={mediaUrl(track.image)}
                   alt={`${track.element}行水墨意象图`}
                   fill
                   sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
