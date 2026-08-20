@@ -3,7 +3,7 @@
 import { useId } from 'react';
 import { LOW_CONFIDENCE } from '@/lib/content-schema';
 import { GraphNode, NODE_TYPE_LABELS } from '@/lib/graph/schema';
-import { GraphLayout, nodeDisplayLabel, truncateLabel } from '@/lib/graph/layout';
+import { GraphLayout, LABEL_BASE_DY, LABEL_FONT_SIZE } from '@/lib/graph/layout';
 
 /**
  * 图谱画布：把布局结果画成 SVG。
@@ -114,14 +114,17 @@ export default function GraphCanvas({
                 strokeWidth={selected ? 2 : 1}
                 strokeOpacity={weak ? 0.5 : 0.9}
               />
+              {/* 标签位置与文本均由布局算出（含碰撞避让），渲染层不得自行改动，
+                  否则避让所依据的包围盒就与实际绘制不一致 */}
               <text
                 x={n.x}
-                y={n.y + n.r + 13}
+                y={n.y + n.r + LABEL_BASE_DY + n.labelDy}
                 textAnchor="middle"
-                className={`text-[11px] ${selected ? 'fill-[var(--cinnabar)]' : 'fill-[var(--text-secondary)]'}`}
+                fontSize={LABEL_FONT_SIZE}
+                className={selected ? 'fill-[var(--cinnabar)]' : 'fill-[var(--text-secondary)]'}
                 style={{ fontFamily: 'var(--font-serif-cn)' }}
               >
-                {nodeDisplayLabel(n.node, n.node.type === 'work' ? 8 : 9)}
+                {n.displayLabel}
               </text>
             </g>
           );
@@ -141,12 +144,13 @@ export default function GraphCanvas({
         />
         <text
           x={center.x}
-          y={center.y + center.r + 18}
+          y={center.y + center.r + LABEL_BASE_DY + center.labelDy}
           textAnchor="middle"
-          className="fill-[var(--text)] text-[15px]"
+          fontSize={15}
+          className="fill-[var(--text)]"
           style={{ fontFamily: 'var(--font-serif-cn)' }}
         >
-          {truncateLabel(center.node.label, 12)}
+          {center.displayLabel}
         </text>
       </g>
     </svg>

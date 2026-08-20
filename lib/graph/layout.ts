@@ -15,6 +15,15 @@
 
 import { GraphNode, GraphView, RelationGroup } from './schema';
 
+/**
+ * 标签排版常量。渲染层（GraphCanvas）必须复用这些值 ——
+ * 布局在这里按同一套数字做碰撞检测，若两边字号不一致，避让结果就是错的。
+ */
+export const LABEL_FONT_SIZE = 11;
+/** 标签基线相对节点圆心下方的距离（不含避让偏移） */
+export const LABEL_BASE_DY = 13;
+const LABEL_LINE_HEIGHT = 14;
+
 export interface PositionedNode {
   node: GraphNode;
   /** 所属分组下标；-1 为中心点 */
@@ -27,6 +36,10 @@ export interface PositionedNode {
   confidence: number;
   /** 关系措辞（用于 title/aria 描述） */
   relationLabel: string;
+  /** 标签避让偏移（相对 LABEL_BASE_DY），由碰撞检测算出 */
+  labelDy: number;
+  /** 画布上实际显示的标签文本（已截断，布局据此算宽度） */
+  displayLabel: string;
 }
 
 export interface SectorLabel {
@@ -97,6 +110,8 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
     r: 13,
     confidence: 1,
     relationLabel: '中心',
+    labelDy: 5,
+    displayLabel: truncateLabel(view.center.label, 12),
   };
 
   // 按比例把画布名额分给各分组，保证每组至少有 1 个（否则某类关系会整组消失）
@@ -134,6 +149,8 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
         r: nodeRadius(item.node, item.edge.weight),
         confidence: item.edge.confidence,
         relationLabel: group.label,
+        labelDy: 0,
+        displayLabel: nodeDisplayLabel(item.node, item.node.type === 'work' ? 8 : 9),
       });
     }
 
@@ -151,7 +168,55 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
     angleCursor += sectorSpan;
   });
 
+  resolveLabelCollisions(nodes, center);
+
   return { width, height, center, nodes, sectors };
+}
+
+/** 标签包围盒（用于碰撞检测）。中文字形宽度约等于字号，故按字数估算 */
+function labelBox(n: PositionedNode) {
+  const w = n.displayLabel.length * LABEL_FONT_SIZE;
+  const baseline = n.y + n.r + LABEL_BASE_DY + n.labelDy;
+  return {
+    x1: n.x - w / 2,
+    x2: n.x + w / 2,
+    y1: baseline - LABEL_LINE_HEIGHT * 0.8,
+    y2: baseline + LABEL_LINE_HEIGHT * 0.2,
+  };
+}
+
+function overlaps(a: ReturnType<typeof labelBox>, b: ReturnType<typeof labelBox>): boolean {
+  return Math.min(a.x2, b.x2) > Math.max(a.x1, b.x1) && Math.min(a.y2, b.y2) > Math.max(a.y1, b.y1);
+}
+
+/**
+ * 标签避让：把互相压盖的标签沿纵向挪开。
+ *
+ * 为什么需要这一步：分扇区 + 交错多圈已经能让大多数中心点的标签互不相干，
+ * 但道藏书名动辄七八字（「洞玄靈寶三師名諱形狀居觀方所文」），
+ * 在典籍密集的扇区里仍会横向压盖 —— 全图抽样显示约 6% 的中心点存在碰撞。
+ * 与其调参碰运气，不如在布局末尾做一次确定性的避让：
+ * 按候选偏移逐个试，取第一个不与已放置标签相交的位置。
+ * 候选偏移在节点上下交替，幅度递增，保证标签始终紧邻自己的节点。
+ */
+function resolveLabelCollisions(nodes: PositionedNode[], center: PositionedNode): void {
+  const CANDIDATES = [0, 14, -26, 28, -40, 42];
+  // 先排布靠上的标签，让避让方向整体一致，避免互相推挤
+  const order = [...nodes].sort((a, b) => a.y - b.y || a.x - b.x);
+  const placed = [labelBox(center)];
+
+  for (const n of order) {
+    let chosen = CANDIDATES[CANDIDATES.length - 1];
+    for (const dy of CANDIDATES) {
+      n.labelDy = dy;
+      if (!placed.some(p => overlaps(labelBox(n), p))) {
+        chosen = dy;
+        break;
+      }
+    }
+    n.labelDy = chosen;
+    placed.push(labelBox(n));
+  }
 }
 
 /**

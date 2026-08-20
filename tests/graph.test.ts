@@ -13,7 +13,12 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
 import { AhoCorasick } from '../lib/graph/matcher';
-import { computeLayout, nodeDisplayLabel } from '../lib/graph/layout';
+import {
+  computeLayout,
+  LABEL_BASE_DY,
+  LABEL_FONT_SIZE,
+  nodeDisplayLabel,
+} from '../lib/graph/layout';
 import { GraphView, nodeId, parseNodeId } from '../lib/graph/schema';
 import {
   expandNode,
@@ -175,6 +180,78 @@ test('画布标签：非典籍节点不做前后缀处理', () => {
   assert.equal(nodeDisplayLabel(node), '符籙');
 });
 
+/**
+ * 标签包围盒：必须与 GraphCanvas 的绘制方式一致
+ * （字号、基线偏移都从 layout 导出，渲染层不得另立一套）。
+ */
+function labelBoxes(layout: ReturnType<typeof computeLayout>) {
+  return [layout.center, ...layout.nodes].map(n => {
+    const w = n.displayLabel.length * LABEL_FONT_SIZE;
+    const baseline = n.y + n.r + LABEL_BASE_DY + n.labelDy;
+    return { x1: n.x - w / 2, x2: n.x + w / 2, y1: baseline - 11.2, y2: baseline + 2.8 };
+  });
+}
+
+function countCollisions(layout: ReturnType<typeof computeLayout>): number {
+  const boxes = labelBoxes(layout);
+  let n = 0;
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = i + 1; j < boxes.length; j++) {
+      const a = boxes[i];
+      const b = boxes[j];
+      if (Math.min(a.x2, b.x2) > Math.max(a.x1, b.x1) && Math.min(a.y2, b.y2) > Math.max(a.y1, b.y1)) n++;
+    }
+  }
+  return n;
+}
+
+test('布局：长书名密集时标签互不压盖', () => {
+  // 道藏书名动辄七八字，同扇区内极易横向压盖，故用真实长书名构造最坏情况
+  const titles = [
+    '洞玄靈寶三師名諱形狀居觀方所文',
+    '洞玄靈寶真靈位業圖',
+    '靈寶無量度人上品妙經',
+    '靈寶無量度人上經大法',
+    '上清洞真元經五籍符',
+    '上清金母求仙上法',
+    '高上神霄玉清真王紫書大法',
+    '高上大洞文昌司祿紫陽寶籙',
+    '太上洞淵三昧神咒齋懺謝儀',
+    '沖虛至德真經鬳齋口義',
+  ];
+  const view: GraphView = {
+    center: { id: 'concept:c', type: 'concept', label: '符籙' },
+    synthetic: false,
+    groups: [
+      {
+        type: 'mentioned_in',
+        label: '见于典籍',
+        total: titles.length,
+        items: titles.map((t, i) => ({
+          node: { id: `work:t${i}`, type: 'work' as const, label: t },
+          edge: {
+            from: 'concept:c',
+            to: `work:t${i}`,
+            type: 'mentioned_in' as const,
+            source: 'mention' as const,
+            confidence: 0.9,
+          },
+          direction: 'out' as const,
+        })),
+      },
+    ],
+  };
+
+  for (const opts of [
+    { width: 900, height: 620, maxNodes: 34 },
+    { width: 760, height: 440, maxNodes: 22 },
+    { width: 400, height: 560, maxNodes: 14 },
+  ]) {
+    const layout = computeLayout(view, opts);
+    assert.equal(countCollisions(layout), 0, `${opts.width}x${opts.height} 出现标签压盖`);
+  }
+});
+
 // ---------- 查询层（依赖真实产物，未构建时跳过） ----------
 
 const graphReady = isGraphAvailable();
@@ -238,6 +315,50 @@ test('查询：典籍中心点带关联文献与本书涉及的本体', skipReas
 test('查询：不存在的节点返回 null 而不抛错', skipReason, () => {
   assert.equal(expandNode('concept:__不存在__'), null);
   assert.equal(graphForWork('0000000000000000'), null);
+});
+
+test('查询：对称关系合并为单一分组且邻居不重复', skipReason, () => {
+  // 词表里「符籙 related_to 正一」与「正一 related_to 符籙」两条边都存在，
+  // 若按方向分组，用户会看到两个「相关概念」分组、正一出现两次
+  const view = expandNode('concept:fulu')!;
+  const relatedGroups = view.groups.filter(g => g.type === 'related_to');
+  assert.equal(relatedGroups.length, 1, '相关概念应只有一组');
+  const labels = relatedGroups[0].items.map(i => i.node.label);
+  assert.equal(new Set(labels).size, labels.length, `分组内邻居重复：${labels.join(',')}`);
+  for (const g of view.groups) {
+    assert.ok(!g.items.some(i => i.node.id === view.center.id), '不应出现指向自身的关系');
+  }
+});
+
+test('全部中心点在三档画布下均无标签压盖与越界', skipReason, () => {
+  // 图谱有近两千个节点，任何一个都可能被用户点成中心点，
+  // 因此这条不变量必须对全图成立，而不是抽查几个
+  const graph = JSON.parse(
+    fs.readFileSync(path.resolve(process.cwd(), 'public/data/graph.json'), 'utf-8'),
+  );
+  const sizes = [
+    { width: 900, height: 620, maxNodes: 34 },
+    { width: 760, height: 440, maxNodes: 22 },
+    { width: 400, height: 560, maxNodes: 14 },
+  ];
+
+  for (const opts of sizes) {
+    let collided = 0;
+    let outOfBounds = 0;
+    for (const node of graph.nodes) {
+      const view = expandNode(node.id);
+      if (!view) continue;
+      const layout = computeLayout(view, opts);
+      if (countCollisions(layout) > 0) collided++;
+      for (const box of labelBoxes(layout)) {
+        if (box.x1 < -4 || box.x2 > opts.width + 4 || box.y1 < -4 || box.y2 > opts.height + 4) {
+          outOfBounds++;
+        }
+      }
+    }
+    assert.equal(collided, 0, `${opts.width}x${opts.height}：${collided} 个中心点存在标签压盖`);
+    assert.equal(outOfBounds, 0, `${opts.width}x${opts.height}：${outOfBounds} 个标签越出画布`);
+  }
 });
 
 // ---------- 内容边界 ----------
