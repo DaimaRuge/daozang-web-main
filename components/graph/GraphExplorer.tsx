@@ -12,6 +12,7 @@ import {
   RelatedItem,
 } from '@/lib/graph/schema';
 import { computeLayout } from '@/lib/graph/layout';
+import { useNarrowViewport } from '@/lib/use-narrow-viewport';
 import GraphCanvas from './GraphCanvas';
 import RelationList, { hrefForNode } from './RelationList';
 
@@ -36,15 +37,20 @@ export default function GraphExplorer({
 }) {
   const [selected, setSelected] = useState<GraphNode | null>(null);
   const [mode, setMode] = useState<'graph' | 'list'>('graph');
+  const narrow = useNarrowViewport();
 
   const layout = useMemo(
     () =>
-      computeLayout(view, {
-        width: variant === 'compact' ? 760 : 900,
-        height: variant === 'compact' ? 440 : 620,
-        maxNodes: variant === 'compact' ? 22 : 34,
-      }),
-    [view, variant],
+      narrow
+        ? // 手机：画布尺寸贴近实际显示宽度，缩放比接近 1:1 才能看清中文标签；
+          // 同时收窄节点数，否则标签必然互相压盖
+          computeLayout(view, { width: 400, height: 560, maxNodes: 14 })
+        : computeLayout(view, {
+            width: variant === 'compact' ? 760 : 900,
+            height: variant === 'compact' ? 440 : 620,
+            maxNodes: variant === 'compact' ? 22 : 34,
+          }),
+    [view, variant, narrow],
   );
 
   /** 选中节点对应的那条边：详情面板要展示「凭什么这么连」 */

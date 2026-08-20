@@ -116,13 +116,16 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
     const sectorSpan = (Math.PI * 2 * count) / shownTotal;
     const tier = TIER[group.type] ?? 0.85;
 
+    // 条目多的分组交错三圈而不是两圈：典籍标题动辄七八个字，
+    // 只错开两层时相邻标签仍会横向压盖
+    const rings = count > 6 ? [1, 0.78, 0.89] : [1, 0.82];
+
     for (let i = 0; i < count; i++) {
       const item = group.items[i];
       // 扇区内均分角度；单节点时置于扇区中线
       const t = count === 1 ? 0.5 : (i + 0.5) / count;
       const angle = angleCursor + sectorSpan * t;
-      // 交错内外两圈，避免相邻标签横向重叠
-      const radial = tier * (i % 2 === 0 ? 1 : 0.82);
+      const radial = tier * rings[i % rings.length];
       nodes.push({
         node: item.node,
         groupIndex: gi,
@@ -186,4 +189,21 @@ function allocateQuota(groups: RelationGroup[], maxNodes: number): number[] {
 /** 标签截断：中文标签过长会撑破扇区，统一截到 9 字 */
 export function truncateLabel(label: string, max = 9): string {
   return label.length > max ? `${label.slice(0, max)}…` : label;
+}
+
+/**
+ * 画布上的节点显示名。
+ *
+ * 为什么要额外处理：部分典籍的 index 标题带着文件名残留
+ * （如「續道藏-漢天師世家-明-張鉞」，属已知的 59 个文件名解析边角案例），
+ * 直接截断会得到「續道藏-漢天師世…」这种毫无信息量的标签。
+ * 这里只在展示层剥掉丛集前缀与朝代-作者后缀，索引与图谱数据本身不动。
+ */
+export function nodeDisplayLabel(node: GraphNode, max = 9): string {
+  let label = node.label;
+  if (node.type === 'work') {
+    label = label.replace(/^[續续]道藏[-—]/, '');
+    label = label.replace(/-(?:[南北朝宋元明清隋唐五代晉漢秦周商夏]|五代)-[\u4e00-\u9fff]{1,8}$/, '');
+  }
+  return truncateLabel(label, max);
 }

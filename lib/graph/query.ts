@@ -118,6 +118,13 @@ function groupLabel(type: GraphEdgeType, direction: 'out' | 'in', centerType: st
   return EDGE_LABELS[type];
 }
 
+/**
+ * 语义上对称的关系类型：方向不携带信息。
+ * 「符籙 related_to 雷法」与「雷法 related_to 符籙」是同一件事，
+ * 若按方向分成两组，用户会看到两个同名分组、同一个邻居出现两次。
+ */
+const SYMMETRIC_TYPES = new Set<GraphEdgeType>(['related_to', 'cooccurs_with', 'similar_work']);
+
 /** 分组内排序：置信度优先，其次权重（提及次数 / 共现部数 / 相似度） */
 function rankItems(items: RelatedItem[]): RelatedItem[] {
   return items.sort((a, b) => {
@@ -139,12 +146,22 @@ export function expandNode(id: string, groupLimit = DEFAULT_GROUP_LIMIT): GraphV
   if (!center) return null;
 
   const buckets = new Map<string, RelatedItem[]>();
+  /** 去重键：同一分组内同一邻居只出现一次（对称关系两个方向都存边时会撞上） */
+  const seen = new Set<string>();
   for (const edge of rt.adjacency.get(id) ?? []) {
     const direction: 'out' | 'in' = edge.from === id ? 'out' : 'in';
     const otherId = direction === 'out' ? edge.to : edge.from;
+    if (otherId === id) continue; // 自环（词表若误配）直接丢弃
     const node = rt.nodeById.get(otherId);
     if (!node) continue;
-    const key = `${edge.type}\u0000${direction}`;
+
+    const key = SYMMETRIC_TYPES.has(edge.type)
+      ? edge.type
+      : `${edge.type}\u0000${direction}`;
+    const dedupe = `${key}\u0000${otherId}`;
+    if (seen.has(dedupe)) continue;
+    seen.add(dedupe);
+
     const list = buckets.get(key);
     if (list) list.push({ node, edge, direction });
     else buckets.set(key, [{ node, edge, direction }]);
@@ -166,8 +183,11 @@ export function expandNode(id: string, groupLimit = DEFAULT_GROUP_LIMIT): GraphV
 
   const groups: RelationGroup[] = [];
   for (const type of ORDER) {
-    for (const direction of ['out', 'in'] as const) {
-      const items = buckets.get(`${type}\u0000${direction}`);
+    const keys = SYMMETRIC_TYPES.has(type)
+      ? ([[type, 'out'] as const])
+      : ([[`${type}\u0000out`, 'out'], [`${type}\u0000in`, 'in']] as const);
+    for (const [key, direction] of keys) {
+      const items = buckets.get(key);
       if (!items || items.length === 0) continue;
       groups.push({
         type,
@@ -294,7 +314,10 @@ export function relatedByKeyword(query: string, groupLimit = DEFAULT_GROUP_LIMIT
     });
   }
 
-  const similar = Array.from(similarScore.values());
+  // 按相似度排序：回退链路的延伸文献是二跳结果，不排序的话首屏会是随机命中
+  const similar = Array.from(similarScore.values()).sort(
+    (a, b) => (b.edge.weight ?? 0) - (a.edge.weight ?? 0),
+  );
   if (similar.length > 0) {
     groups.push({
       type: 'similar_work',

@@ -13,7 +13,7 @@ import assert from 'node:assert/strict';
 import fs from 'fs';
 import path from 'path';
 import { AhoCorasick } from '../lib/graph/matcher';
-import { computeLayout } from '../lib/graph/layout';
+import { computeLayout, nodeDisplayLabel } from '../lib/graph/layout';
 import { GraphView, nodeId, parseNodeId } from '../lib/graph/schema';
 import {
   expandNode,
@@ -151,6 +151,28 @@ test('布局：每个分组都分到扇区标题', () => {
   const layout = computeLayout(fakeView(), { maxNodes: 20 });
   assert.equal(layout.sectors.length, 2);
   assert.ok(layout.sectors.some(s => s.label === '见于典籍'));
+});
+
+test('画布标签：剥掉文件名残留的丛集前缀与朝代作者后缀', () => {
+  const node = {
+    id: 'work:x',
+    type: 'work' as const,
+    label: '續道藏-漢天師世家-明-張鉞',
+  };
+  assert.equal(nodeDisplayLabel(node), '漢天師世家');
+});
+
+test('画布标签：正常书名只做长度截断，不误伤含朝代字的标题', () => {
+  const node = { id: 'work:y', type: 'work' as const, label: '太上洞玄靈寶無量度人上品妙經' };
+  assert.equal(nodeDisplayLabel(node, 8), '太上洞玄靈寶無量…');
+  // 「明」在标题中间不构成「-朝代-人名」后缀，不应被剪掉
+  const keep = { id: 'work:z', type: 'work' as const, label: '黃庭內景玉經注' };
+  assert.equal(nodeDisplayLabel(keep), '黃庭內景玉經注');
+});
+
+test('画布标签：非典籍节点不做前后缀处理', () => {
+  const node = { id: 'concept:a', type: 'concept' as const, label: '符籙' };
+  assert.equal(nodeDisplayLabel(node), '符籙');
 });
 
 // ---------- 查询层（依赖真实产物，未构建时跳过） ----------

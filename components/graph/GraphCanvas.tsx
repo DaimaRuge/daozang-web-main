@@ -3,7 +3,7 @@
 import { useId } from 'react';
 import { LOW_CONFIDENCE } from '@/lib/content-schema';
 import { GraphNode, NODE_TYPE_LABELS } from '@/lib/graph/schema';
-import { GraphLayout, truncateLabel } from '@/lib/graph/layout';
+import { GraphLayout, nodeDisplayLabel, truncateLabel } from '@/lib/graph/layout';
 
 /**
  * 图谱画布：把布局结果画成 SVG。
@@ -121,7 +121,7 @@ export default function GraphCanvas({
                 className={`text-[11px] ${selected ? 'fill-[var(--cinnabar)]' : 'fill-[var(--text-secondary)]'}`}
                 style={{ fontFamily: 'var(--font-serif-cn)' }}
               >
-                {truncateLabel(n.node.label)}
+                {nodeDisplayLabel(n.node, n.node.type === 'work' ? 8 : 9)}
               </text>
             </g>
           );
