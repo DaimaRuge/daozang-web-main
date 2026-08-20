@@ -257,7 +257,7 @@ test('布局：长书名密集时标签互不压盖', () => {
   for (const opts of [
     { width: 900, height: 620, maxNodes: 34 },
     { width: 760, height: 440, maxNodes: 22 },
-    { width: 400, height: 580, maxNodes: 12, labelFontSize: 14 },
+    { width: 400, height: 520, maxNodes: 12, labelFontSize: 14 },
   ]) {
     const layout = computeLayout(view, opts);
     assert.equal(countCollisions(layout), 0, `${opts.width}x${opts.height} 出现标签压盖`);
@@ -351,7 +351,7 @@ test('全部中心点在三档画布下均无标签压盖与越界', skipReason,
   const sizes = [
     { width: 900, height: 620, maxNodes: 34 },
     { width: 760, height: 440, maxNodes: 22 },
-    { width: 400, height: 580, maxNodes: 12, labelFontSize: 14 },
+    { width: 400, height: 520, maxNodes: 12, labelFontSize: 14 },
   ];
 
   for (const opts of sizes) {
