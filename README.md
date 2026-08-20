@@ -13,6 +13,9 @@
 - ✍️ 划词操作：选中文字即可复制、收藏段落、添加笔记（AI 解释入口已预留）
 - 🏠 我的书房：最近阅读（含进度）、收藏、笔记，数据保存在浏览器本地
 - 🔍 双模式搜索：书名搜索 + 全文搜索（上下文摘要与关键词高亮）；简体查询自动命中繁体语料；阅读器内书内搜索定位
+- 🕸 关联图谱（`/graph`）：从一个概念/宗派/人物/科仪/典籍出发逐跳展开关联本体与文献，
+  点击即回溯到原文那一段；搜索页与阅读页均有入口。关系分目录事实、词表策展、原文提及、
+  统计推算四类并如实标注来源，低置信度标「待考」（构建：`npm run build-graph`）
 - 📚 按部类分类浏览（洞真部、洞玄部、洞神部、太平部、太清部、太玄部、正一部、续道藏）
 - 🤖 智能问道：AI 对话页（概念级检索增强、带原文引用）+ 划词 AI 解释/现代汉语转写 + 阅读页「问道此书」带上下文进入对话（需配置 OpenAI 兼容服务环境变量，见 `docs/ARCHITECTURE.md`）；`/api/agent` 工具调用接口与 AgentContext 上下文契约
 - 🛠 解析人工审核：开发环境 `/review` 页逐块校正低置信度解析结果，校正数据随代码提交生效
@@ -51,15 +54,21 @@ git clone https://github.com/DaimaRuge/daozang-text.git data/daozang-text
 # 构建数据索引
 npm run build-index
 
+# 构建知识图谱（读 public/data，约 2 秒；产物 public/data/graph.json）
+npm run build-graph
+
 # 启动开发服务器
 npm run dev
 ```
+
+> 图谱产物随仓库提交，日常开发无需重建；仅在改动 `data/graph/gazetteer.json`
+> 或 `scripts/build-graph.ts` 后需要重新运行 `npm run build-graph`。
 
 ## 测试
 
 ```bash
 npm run lint   # ESLint
-npm test       # 单元测试（解析器 / 检索层 / 人工校正层）
+npm test       # 单元测试（解析器 / 检索层 / 人工校正层 / 知识图谱）
 ```
 
 打开 http://localhost:3000

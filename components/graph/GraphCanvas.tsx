@@ -118,7 +118,7 @@ export default function GraphCanvas({
               {/* 标签位置与文本均由布局算出（含碰撞避让），渲染层不得自行改动，
                   否则避让所依据的包围盒就与实际绘制不一致 */}
               <text
-                x={n.x}
+                x={n.labelX}
                 y={n.y + n.r + LABEL_BASE_DY + n.labelDy}
                 textAnchor="middle"
                 fontSize={labelFontSize}
@@ -144,7 +144,7 @@ export default function GraphCanvas({
           strokeWidth={2}
         />
         <text
-          x={center.x}
+          x={center.labelX}
           y={center.y + center.r + LABEL_BASE_DY + center.labelDy}
           textAnchor="middle"
           fontSize={centerFontSize(labelFontSize)}

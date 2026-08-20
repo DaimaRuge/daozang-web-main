@@ -40,6 +40,11 @@ export interface PositionedNode {
   relationLabel: string;
   /** 标签避让偏移（相对 LABEL_BASE_DY），由碰撞检测算出 */
   labelDy: number;
+  /**
+   * 标签锚点横坐标。通常等于节点的 x，但靠边的节点会被钳制回画布内 ——
+   * 标签略微偏离自己的节点，总比被画布裁掉半截要好。
+   */
+  labelX: number;
   /** 画布上实际显示的标签文本（已截断，布局据此算宽度） */
   displayLabel: string;
 }
@@ -105,9 +110,14 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
 
   const cx = width / 2;
   const cy = height / 2;
-  // 椭圆半径：留出边距给标签，横向比纵向宽松（中文标签是横排的）
-  const rx = width / 2 - 110;
-  const ry = height / 2 - 64;
+  // 椭圆半径：边距必须随画布尺寸缩放。此前横向边距写死 110px，
+  // 在窄屏 400 宽的画布上只剩 90 的横向半径，节点会挤进中心标签横跨的区域。
+  const rx = width / 2 - clamp(width * 0.14, 48, 120);
+  const ry = height / 2 - clamp(height * 0.09, 40, 70);
+
+  // 中心标签字号更大，长书名极易横穿内圈节点，故按可用横向空间限制字数
+  const centerFs = centerFontSize(labelFontSize);
+  const centerMaxChars = Math.min(12, Math.max(4, Math.floor((rx * 0.9) / centerFs)));
 
   const center: PositionedNode = {
     node: view.center,
@@ -118,7 +128,8 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
     confidence: 1,
     relationLabel: '中心',
     labelDy: 5,
-    displayLabel: truncateLabel(view.center.label, 12),
+    labelX: cx,
+    displayLabel: truncateLabel(view.center.label, centerMaxChars),
   };
 
   // 按比例把画布名额分给各分组，保证每组至少有 1 个（否则某类关系会整组消失）
@@ -157,6 +168,7 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
         confidence: item.edge.confidence,
         relationLabel: group.label,
         labelDy: 0,
+        labelX: cx + Math.cos(angle) * rx * radial,
         displayLabel: nodeDisplayLabel(item.node, item.node.type === 'work' ? 8 : 9),
       });
     }
@@ -175,7 +187,7 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
     angleCursor += sectorSpan;
   });
 
-  resolveLabelCollisions(nodes, center, labelFontSize);
+  resolveLabelCollisions(nodes, center, labelFontSize, width, height);
 
   return { width, height, center, nodes, sectors, labelFontSize };
 }
@@ -189,11 +201,17 @@ export function labelBox(n: PositionedNode, fontSize: number) {
   const baseline = n.y + n.r + LABEL_BASE_DY + n.labelDy;
   const lineHeight = fontSize * 1.28;
   return {
-    x1: n.x - w / 2,
-    x2: n.x + w / 2,
+    x1: n.labelX - w / 2,
+    x2: n.labelX + w / 2,
     y1: baseline - lineHeight * 0.8,
     y2: baseline + lineHeight * 0.2,
   };
+}
+
+/** 把标签锚点钳制回画布内（标签过宽时居中，交由截断兜底处理） */
+function clampLabelX(n: PositionedNode, fontSize: number, width: number): number {
+  const half = (n.displayLabel.length * fontSize) / 2 + 3;
+  return half * 2 >= width ? width / 2 : clamp(n.x, half, width - half);
 }
 
 export function labelsOverlap(
@@ -208,20 +226,32 @@ export function centerFontSize(labelFontSize: number): number {
   return Math.round(labelFontSize * 1.36);
 }
 
+function clamp(v: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, v));
+}
+
+/** 节点圆的包围盒：标签不得压在任何节点圆上，否则看着像渲染错乱 */
+function circleBox(n: PositionedNode) {
+  return { x1: n.x - n.r, x2: n.x + n.r, y1: n.y - n.r, y2: n.y + n.r };
+}
+
 /**
- * 标签避让：把互相压盖的标签沿纵向挪开。
+ * 标签避让：把标签沿纵向挪开，使其既不压盖别的标签，也不压在节点圆上。
  *
  * 为什么需要这一步：分扇区 + 交错多圈已经能让大多数中心点的标签互不相干，
  * 但道藏书名动辄七八字（「洞玄靈寶三師名諱形狀居觀方所文」），
- * 在典籍密集的扇区里仍会横向压盖 —— 全图抽样显示约 6% 的中心点存在碰撞。
- * 与其调参碰运气，不如在布局末尾做一次确定性的避让：
- * 按候选偏移逐个试，取第一个不与已放置标签相交的位置。
- * 候选偏移在节点上下交替，幅度递增，保证标签始终紧邻自己的节点。
+ * 在典籍密集的扇区里仍会压盖 —— 全图核算显示约 6% 的中心点存在标签互压，
+ * 窄屏上还会出现长标签横穿邻近节点圆的情况。
+ * 与其调参碰运气，不如在布局末尾做一次确定性避让：按候选偏移逐个试，
+ * 取第一个既不撞标签也不撞节点圆的位置；候选偏移上下交替、幅度递增，
+ * 保证标签始终紧邻自己的节点。车道全被占满时才退而缩短标签。
  */
 function resolveLabelCollisions(
   nodes: PositionedNode[],
   center: PositionedNode,
   labelFontSize: number,
+  width: number,
+  height: number,
 ): void {
   // 候选偏移按字号成比例（字号变大时避让幅度同步变大），上下交替、幅度递增
   const step = labelFontSize * 1.28;
@@ -233,12 +263,30 @@ function resolveLabelCollisions(
   // 先排布靠上的标签，让避让方向整体一致，避免互相推挤
   const order = [...nodes].sort((a, b) => a.y - b.y || a.x - b.x);
   const placed = [labelBox(center, centerFontSize(labelFontSize))];
+  // 节点圆是固定障碍物；自己的圆要排除，否则标签紧贴在圆下方就永远「撞」
+  const circles = new Map<PositionedNode, ReturnType<typeof circleBox>>(
+    [center, ...nodes].map(n => [n, circleBox(n)]),
+  );
 
-  /** 在各纵向车道上试放当前标签，找到不与已放置标签相交的位置即返回 true */
+  /** 在各纵向车道上试放当前标签，找到既不撞标签也不撞节点圆的位置即返回 true */
   const tryLanes = (n: PositionedNode): boolean => {
+    // 钳制必须在碰撞检测之前：检测要基于标签最终画在哪里
+    n.labelX = clampLabelX(n, labelFontSize, width);
     for (const dy of candidates) {
       n.labelDy = dy;
-      if (!placed.some(p => labelsOverlap(labelBox(n, labelFontSize), p))) return true;
+      const box = labelBox(n, labelFontSize);
+      // 避让不能把标签挤出画布：越界的车道直接跳过，宁可再缩短标签
+      if (box.y1 < 0 || box.y2 > height) continue;
+      if (placed.some(p => labelsOverlap(box, p))) continue;
+      let hitsCircle = false;
+      for (const [owner, c] of circles) {
+        if (owner === n) continue;
+        if (labelsOverlap(box, c)) {
+          hitsCircle = true;
+          break;
+        }
+      }
+      if (!hitsCircle) return true;
     }
     return false;
   };
@@ -249,9 +297,16 @@ function resolveLabelCollisions(
     // 先用完整标签试各个车道；车道都被占满时才退而缩短标签
     // （窄屏上长书名密集时会走到这一步：宁可多截几个字，也不能让标签叠在一起）
     if (!tryLanes(n)) {
-      for (let maxLen = full.length - 2; maxLen >= 3; maxLen -= 2) {
+      let settled = false;
+      for (let maxLen = full.length - 2; maxLen >= 3 && !settled; maxLen -= 2) {
         n.displayLabel = truncateLabel(full, maxLen);
-        if (tryLanes(n)) break;
+        settled = tryLanes(n);
+      }
+      // 极端情况下所有车道都不可用：至少保证标签留在画布内
+      if (!settled) {
+        const box = labelBox(n, labelFontSize);
+        if (box.y2 > height) n.labelDy -= box.y2 - height;
+        else if (box.y1 < 0) n.labelDy -= box.y1;
       }
     }
 

@@ -6,14 +6,16 @@ import { graphHrefForView, GraphView, NODE_TYPE_LABELS } from '@/lib/graph/schem
 import GraphExplorer from './GraphExplorer';
 
 /**
- * 关联图谱折叠面板：嵌在搜索页结果之上的入口。
+ * 关联图谱面板：嵌在搜索页结果之上的入口。
  *
- * 为什么默认折叠：搜索页的主任务是看命中结果，图谱是「顺手多看一眼关系」的
- * 增强，不应挤占结果列表的首屏（项目交互原则是克制、非打扰式）。
- * 折叠时用一行关系摘要预告图里有什么，用户才有理由展开。
+ * 展开策略：检索词命中图谱实体时默认展开 —— 用户搜「符箓」想要的正是
+ * 「除了匹配结果，还有哪些关联本体与文献」，这时把它藏在一次点击后面
+ * 等于把主菜端上来又盖上盖子（实测中确有人找不到入口）。
+ * 反之走关键词回退链路时（synthetic）关系较弱，默认折叠，
+ * 只用一行摘要预告，避免噪声挤占结果首屏。
  */
 export default function GraphPanel({ view }: { view: GraphView }) {
-  const [open, setOpen] = useState(false);
+  const [open, setOpen] = useState(!view.synthetic);
 
   // 折叠态摘要：取前几组关系里最靠前的邻居，让用户预知展开后能看到什么
   const preview = view.groups
@@ -50,7 +52,7 @@ export default function GraphPanel({ view }: { view: GraphView }) {
             </span>
           )}
         </span>
-        <span className="text-xs text-[var(--accent)] shrink-0 pt-1">{open ? '收起' : '展开关系图'}</span>
+        <span className="text-xs text-[var(--accent)] shrink-0 pt-1">{open ? '收起关系图' : '展开关系图'}</span>
       </button>
 
       {open && (

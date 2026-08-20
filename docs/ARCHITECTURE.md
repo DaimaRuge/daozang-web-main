@@ -26,6 +26,7 @@ components/
   reader/               阅读器组件族（编排/渲染/目录/设置/划词/笔记 各自独立）
 lib/
   content-schema.ts     内容数据模型（ContentBlock/ParsedBook/ImageAsset，接口契约单一来源）
+  graph/                知识图谱（第三层内容：schema 契约 / 多模式匹配 / 只读查询 / 径向布局）
   text-parser.ts        规则解析器 rule-v3（纯函数，可独立测试）
   parser-overrides.ts   人工校正层（/review 产出的 overrides 叠加到解析结果）
   zh-convert.ts         简繁转换（opencc-js），检索层查询变体扩展
@@ -45,7 +46,37 @@ tests/                  单元测试（解析器/检索/人工校正层）
 
 1. **原始文本**：`public/data/content/*.json`，不可变底稿；
 2. **结构化文本**：`parseText()` 在读取时按规则生成 ContentBlock（带行号溯源、置信度、解析器版本），低置信度块渲染为待审核样式；
-3. **AI 增强内容**：`ai-explanation` 块类型与 Citation 引用结构已预留，必须显式标注，绝不与原文混排。
+3. **AI 增强与策展内容**：`ai-explanation` 块类型与 Citation 引用结构已预留，必须显式标注，绝不与原文混排；
+   知识图谱（`lib/graph`）亦属此层 —— 词表释义与统计推算出的关系必须标注来源，不得伪装为典籍内容。
+
+### 知识图谱模块
+
+道藏 1504 部、约 3500 万字，用户无法从全图找路，需要的是「从一个局部逐跳向外展开」。
+图谱因此不做全图渲染，只做**中心点 + 一跳邻域**：
+
+```mermaid
+flowchart LR
+  gaz["data/graph/gazetteer.json 策展词表"] --> build["scripts/build-graph.ts"]
+  idx["public/data/index.json 目录"] --> build
+  content["public/data/content 原文（只读）"] --> build
+  build --> artifact["public/data/graph.json 单一产物"]
+  artifact --> query["lib/graph/query.ts 只读查询"]
+  query --> search["搜索页折叠面板"]
+  query --> page["/graph 页"]
+  query --> reader["阅读页「本书关联」"]
+  query --> agent["Agent find_related_concepts"]
+```
+
+| 关注点 | 决策与理由 |
+|---|---|
+| 计算时机 | 构建期（`npm run build-graph`，全库约 2s）。运行时扫不动 3500 万字，且生产无持久盘，不能依赖数据库 |
+| 产物形态 | 单一 `public/data/graph.json`（约 4.8MB，与 index.json 同量级），模块级缓存。不用「每节点一文件」：`public/data` 已有 1500+ 文件，再加数千碎文件只拖慢 git 与部署 |
+| 提及扫描 | Aho-Corasick（`lib/graph/matcher.ts`）。上千别名 × 3500 万字若逐词 `indexOf` 是数百亿次比较；自动机压成一遍扫描，最长匹配优先以免通用词淹没具体术语 |
+| 出处溯源 | 提及边存 `blockId`，借阅读器既有的 `#blockId` 深链（分页大部头会先翻页再闪烁）落到出现该词的那一段 |
+| 关系强弱 | 每条边带 `source` 与 `confidence`；共现按 Jaccard 排序而非原始次数（否则邻居全是「無為」「長生」等泛词）；低于 `LOW_CONFIDENCE` 的边 UI 标「待考」 |
+| 找关联文献 | 典籍间 `similar_work` 边由共享概念的 IDF 加权余弦算出，通用概念按文档频率剔除 |
+| 全库覆盖 | 词表未命中的检索词走「关键词 → 命中典籍 → 其概念边」回退链路，使任意冷僻词都有关系可看，而非只覆盖策展过的词 |
+| 可视化 | 分扇区径向布局（`lib/graph/layout.ts`，纯函数、SSR 与客户端一致），不引图布局库；标签做确定性碰撞避让，并有等价的关系列表视图承担无障碍与无 JS 场景 |
 
 ### Web as Agent 数据流
 
@@ -172,8 +203,16 @@ DZ_LLM_MODEL=deepseek-chat
 - 用户账号与数据同步（lib/user-data 模型已按可迁移设计）
 - 概念检索升级：候选词提取从停用词规则升级为道教概念词表/分词器
 
+**知识图谱（第一期已落地，见上「知识图谱模块」）**
+- 已完成：schema 契约、94 条策展词表（以符箓语义域为核心）、全库块级提及扫描、
+  概念共现与文献相关度、四个入口（搜索页 / `/graph` / 阅读页 / Agent 工具）
+- 第二期：词表扩至 1000+；仿 `/review` 做低置信度边的人工审核（只写图谱 overrides，不碰原文）；
+  作者字段清洗（`index.json` 的 `宋-宋-王慶升` 类题署噪声）
+- 第三期：可选 LLM 关系抽取（产出必须进待审队列）；馆藏图像资产入图；
+  向量检索作为实体解析失败时的辅助召回，而非替代本体边
+
 **中期**
-- 向量检索 + 语义搜索；人物/宗派/概念知识图谱；主题阅读与专题策展
+- 向量检索 + 语义搜索；主题阅读与专题策展
 - 图片资产接入（ImageAsset 模型已就绪，需来源审核流程）
 
 **长期**

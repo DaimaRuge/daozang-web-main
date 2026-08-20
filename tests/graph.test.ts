@@ -203,6 +203,20 @@ function countCollisions(layout: ReturnType<typeof computeLayout>): number {
   return n;
 }
 
+/** 标签压在别人的节点圆上同样是渲染错乱，必须一并守住 */
+function countLabelOverCircle(layout: ReturnType<typeof computeLayout>): number {
+  const items = [layout.center, ...layout.nodes];
+  const boxes = labelBoxes(layout);
+  const circles = items.map(n => ({ x1: n.x - n.r, x2: n.x + n.r, y1: n.y - n.r, y2: n.y + n.r }));
+  let n = 0;
+  for (let i = 0; i < boxes.length; i++) {
+    for (let j = 0; j < circles.length; j++) {
+      if (i !== j && labelsOverlap(boxes[i], circles[j])) n++;
+    }
+  }
+  return n;
+}
+
 test('布局：长书名密集时标签互不压盖', () => {
   // 道藏书名动辄七八字，同扇区内极易横向压盖，故用真实长书名构造最坏情况
   const titles = [
@@ -342,12 +356,14 @@ test('全部中心点在三档画布下均无标签压盖与越界', skipReason,
 
   for (const opts of sizes) {
     let collided = 0;
+    let overCircle = 0;
     let outOfBounds = 0;
     for (const node of graph.nodes) {
       const view = expandNode(node.id);
       if (!view) continue;
       const layout = computeLayout(view, opts);
       if (countCollisions(layout) > 0) collided++;
+      if (countLabelOverCircle(layout) > 0) overCircle++;
       for (const box of labelBoxes(layout)) {
         if (box.x1 < -4 || box.x2 > opts.width + 4 || box.y1 < -4 || box.y2 > opts.height + 4) {
           outOfBounds++;
@@ -355,6 +371,7 @@ test('全部中心点在三档画布下均无标签压盖与越界', skipReason,
       }
     }
     assert.equal(collided, 0, `${opts.width}x${opts.height}：${collided} 个中心点存在标签压盖`);
+    assert.equal(overCircle, 0, `${opts.width}x${opts.height}：${overCircle} 个中心点存在标签压在节点圆上`);
     assert.equal(outOfBounds, 0, `${opts.width}x${opts.height}：${outOfBounds} 个标签越出画布`);
   }
 });
