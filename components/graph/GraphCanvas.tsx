@@ -3,7 +3,7 @@
 import { useId } from 'react';
 import { LOW_CONFIDENCE } from '@/lib/content-schema';
 import { GraphNode, NODE_TYPE_LABELS } from '@/lib/graph/schema';
-import { GraphLayout, LABEL_BASE_DY, LABEL_FONT_SIZE } from '@/lib/graph/layout';
+import { centerFontSize, GraphLayout, LABEL_BASE_DY } from '@/lib/graph/layout';
 
 /**
  * 图谱画布：把布局结果画成 SVG。
@@ -27,7 +27,7 @@ export default function GraphCanvas({
 }) {
   // 同页可能出现多张图（搜索页面板 + 详情），渐变 id 必须唯一
   const uid = useId().replace(/:/g, '');
-  const { width, height, center, nodes, sectors } = layout;
+  const { width, height, center, nodes, sectors, labelFontSize } = layout;
 
   return (
     <svg
@@ -74,7 +74,8 @@ export default function GraphCanvas({
             x={s.x}
             y={s.y}
             textAnchor={Math.cos(s.angle) > 0.25 ? 'start' : Math.cos(s.angle) < -0.25 ? 'end' : 'middle'}
-            className="fill-[var(--muted)] text-[11px]"
+            fontSize={labelFontSize}
+            className="fill-[var(--muted)]"
             style={{ fontFamily: 'var(--font-sans-cn)' }}
           >
             {s.label}
@@ -120,7 +121,7 @@ export default function GraphCanvas({
                 x={n.x}
                 y={n.y + n.r + LABEL_BASE_DY + n.labelDy}
                 textAnchor="middle"
-                fontSize={LABEL_FONT_SIZE}
+                fontSize={labelFontSize}
                 className={selected ? 'fill-[var(--cinnabar)]' : 'fill-[var(--text-secondary)]'}
                 style={{ fontFamily: 'var(--font-serif-cn)' }}
               >
@@ -146,7 +147,7 @@ export default function GraphCanvas({
           x={center.x}
           y={center.y + center.r + LABEL_BASE_DY + center.labelDy}
           textAnchor="middle"
-          fontSize={15}
+          fontSize={centerFontSize(labelFontSize)}
           className="fill-[var(--text)]"
           style={{ fontFamily: 'var(--font-serif-cn)' }}
         >

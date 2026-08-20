@@ -43,8 +43,8 @@ export default function GraphExplorer({
     () =>
       narrow
         ? // 手机：画布尺寸贴近实际显示宽度，缩放比接近 1:1 才能看清中文标签；
-          // 同时收窄节点数，否则标签必然互相压盖
-          computeLayout(view, { width: 400, height: 560, maxNodes: 14 })
+          // 字号再放大一档以追上正文，同时收窄节点数腾出避让空间
+          computeLayout(view, { width: 400, height: 580, maxNodes: 12, labelFontSize: 14 })
         : computeLayout(view, {
             width: variant === 'compact' ? 760 : 900,
             height: variant === 'compact' ? 440 : 620,

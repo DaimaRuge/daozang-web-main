@@ -16,13 +16,15 @@
 import { GraphNode, GraphView, RelationGroup } from './schema';
 
 /**
- * 标签排版常量。渲染层（GraphCanvas）必须复用这些值 ——
- * 布局在这里按同一套数字做碰撞检测，若两边字号不一致，避让结果就是错的。
+ * 标签排版常量。渲染层（GraphCanvas）必须复用布局给出的字号 ——
+ * 碰撞检测按同一套数字算包围盒，若两边字号不一致，避让结果就是错的。
+ *
+ * 字号之所以可配：SVG 按 viewBox 等比缩放，窄屏画布小、缩放比接近 1，
+ * 需要比宽屏更大的 viewBox 字号才能让实际显示字号追上正文。
  */
-export const LABEL_FONT_SIZE = 11;
+export const DEFAULT_LABEL_FONT_SIZE = 11;
 /** 标签基线相对节点圆心下方的距离（不含避让偏移） */
 export const LABEL_BASE_DY = 13;
-const LABEL_LINE_HEIGHT = 14;
 
 export interface PositionedNode {
   node: GraphNode;
@@ -60,6 +62,8 @@ export interface GraphLayout {
   center: PositionedNode;
   nodes: PositionedNode[];
   sectors: SectorLabel[];
+  /** 标签字号（viewBox 单位）。渲染层必须用这个值，不得另设 */
+  labelFontSize: number;
 }
 
 export interface LayoutOptions {
@@ -67,6 +71,8 @@ export interface LayoutOptions {
   height?: number;
   /** 画布上最多摆放的邻居数（超出的只在列表视图里出现） */
   maxNodes?: number;
+  /** 标签字号（viewBox 单位）；窄屏应给更大值以抵消缩放 */
+  labelFontSize?: number;
 }
 
 /** 关系类型 → 距中心的相对远近。目录事实近，统计推算远 */
@@ -95,6 +101,7 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
   const width = options.width ?? 900;
   const height = options.height ?? 620;
   const maxNodes = options.maxNodes ?? 34;
+  const labelFontSize = options.labelFontSize ?? DEFAULT_LABEL_FONT_SIZE;
 
   const cx = width / 2;
   const cy = height / 2;
@@ -168,25 +175,37 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
     angleCursor += sectorSpan;
   });
 
-  resolveLabelCollisions(nodes, center);
+  resolveLabelCollisions(nodes, center, labelFontSize);
 
-  return { width, height, center, nodes, sectors };
+  return { width, height, center, nodes, sectors, labelFontSize };
 }
 
-/** 标签包围盒（用于碰撞检测）。中文字形宽度约等于字号，故按字数估算 */
-function labelBox(n: PositionedNode) {
-  const w = n.displayLabel.length * LABEL_FONT_SIZE;
+/**
+ * 标签包围盒（用于碰撞检测与测试）。
+ * 中文字形宽度约等于字号，故按字数估算；中心点字号更大，单独传入。
+ */
+export function labelBox(n: PositionedNode, fontSize: number) {
+  const w = n.displayLabel.length * fontSize;
   const baseline = n.y + n.r + LABEL_BASE_DY + n.labelDy;
+  const lineHeight = fontSize * 1.28;
   return {
     x1: n.x - w / 2,
     x2: n.x + w / 2,
-    y1: baseline - LABEL_LINE_HEIGHT * 0.8,
-    y2: baseline + LABEL_LINE_HEIGHT * 0.2,
+    y1: baseline - lineHeight * 0.8,
+    y2: baseline + lineHeight * 0.2,
   };
 }
 
-function overlaps(a: ReturnType<typeof labelBox>, b: ReturnType<typeof labelBox>): boolean {
+export function labelsOverlap(
+  a: ReturnType<typeof labelBox>,
+  b: ReturnType<typeof labelBox>,
+): boolean {
   return Math.min(a.x2, b.x2) > Math.max(a.x1, b.x1) && Math.min(a.y2, b.y2) > Math.max(a.y1, b.y1);
+}
+
+/** 中心点字号相对邻居标签放大，视觉上确立中心地位 */
+export function centerFontSize(labelFontSize: number): number {
+  return Math.round(labelFontSize * 1.36);
 }
 
 /**
@@ -199,23 +218,44 @@ function overlaps(a: ReturnType<typeof labelBox>, b: ReturnType<typeof labelBox>
  * 按候选偏移逐个试，取第一个不与已放置标签相交的位置。
  * 候选偏移在节点上下交替，幅度递增，保证标签始终紧邻自己的节点。
  */
-function resolveLabelCollisions(nodes: PositionedNode[], center: PositionedNode): void {
-  const CANDIDATES = [0, 14, -26, 28, -40, 42];
+function resolveLabelCollisions(
+  nodes: PositionedNode[],
+  center: PositionedNode,
+  labelFontSize: number,
+): void {
+  // 候选偏移按字号成比例（字号变大时避让幅度同步变大），上下交替、幅度递增
+  const step = labelFontSize * 1.28;
+  const candidates = [0];
+  for (let k = 1; k <= 5; k++) {
+    candidates.push(step * k, -step * (k + 0.9));
+  }
+
   // 先排布靠上的标签，让避让方向整体一致，避免互相推挤
   const order = [...nodes].sort((a, b) => a.y - b.y || a.x - b.x);
-  const placed = [labelBox(center)];
+  const placed = [labelBox(center, centerFontSize(labelFontSize))];
+
+  /** 在各纵向车道上试放当前标签，找到不与已放置标签相交的位置即返回 true */
+  const tryLanes = (n: PositionedNode): boolean => {
+    for (const dy of candidates) {
+      n.labelDy = dy;
+      if (!placed.some(p => labelsOverlap(labelBox(n, labelFontSize), p))) return true;
+    }
+    return false;
+  };
 
   for (const n of order) {
-    let chosen = CANDIDATES[CANDIDATES.length - 1];
-    for (const dy of CANDIDATES) {
-      n.labelDy = dy;
-      if (!placed.some(p => overlaps(labelBox(n), p))) {
-        chosen = dy;
-        break;
+    const full = n.displayLabel;
+
+    // 先用完整标签试各个车道；车道都被占满时才退而缩短标签
+    // （窄屏上长书名密集时会走到这一步：宁可多截几个字，也不能让标签叠在一起）
+    if (!tryLanes(n)) {
+      for (let maxLen = full.length - 2; maxLen >= 3; maxLen -= 2) {
+        n.displayLabel = truncateLabel(full, maxLen);
+        if (tryLanes(n)) break;
       }
     }
-    n.labelDy = chosen;
-    placed.push(labelBox(n));
+
+    placed.push(labelBox(n, labelFontSize));
   }
 }
 

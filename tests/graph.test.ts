@@ -14,9 +14,10 @@ import fs from 'fs';
 import path from 'path';
 import { AhoCorasick } from '../lib/graph/matcher';
 import {
+  centerFontSize,
   computeLayout,
-  LABEL_BASE_DY,
-  LABEL_FONT_SIZE,
+  labelBox,
+  labelsOverlap,
   nodeDisplayLabel,
 } from '../lib/graph/layout';
 import { GraphView, nodeId, parseNodeId } from '../lib/graph/schema';
@@ -181,15 +182,14 @@ test('画布标签：非典籍节点不做前后缀处理', () => {
 });
 
 /**
- * 标签包围盒：必须与 GraphCanvas 的绘制方式一致
- * （字号、基线偏移都从 layout 导出，渲染层不得另立一套）。
+ * 标签包围盒：复用布局导出的 labelBox 与字号，
+ * 与 GraphCanvas 的实际绘制口径一致（渲染层不得另立一套字号）。
  */
 function labelBoxes(layout: ReturnType<typeof computeLayout>) {
-  return [layout.center, ...layout.nodes].map(n => {
-    const w = n.displayLabel.length * LABEL_FONT_SIZE;
-    const baseline = n.y + n.r + LABEL_BASE_DY + n.labelDy;
-    return { x1: n.x - w / 2, x2: n.x + w / 2, y1: baseline - 11.2, y2: baseline + 2.8 };
-  });
+  return [
+    labelBox(layout.center, centerFontSize(layout.labelFontSize)),
+    ...layout.nodes.map(n => labelBox(n, layout.labelFontSize)),
+  ];
 }
 
 function countCollisions(layout: ReturnType<typeof computeLayout>): number {
@@ -197,9 +197,7 @@ function countCollisions(layout: ReturnType<typeof computeLayout>): number {
   let n = 0;
   for (let i = 0; i < boxes.length; i++) {
     for (let j = i + 1; j < boxes.length; j++) {
-      const a = boxes[i];
-      const b = boxes[j];
-      if (Math.min(a.x2, b.x2) > Math.max(a.x1, b.x1) && Math.min(a.y2, b.y2) > Math.max(a.y1, b.y1)) n++;
+      if (labelsOverlap(boxes[i], boxes[j])) n++;
     }
   }
   return n;
@@ -245,7 +243,7 @@ test('布局：长书名密集时标签互不压盖', () => {
   for (const opts of [
     { width: 900, height: 620, maxNodes: 34 },
     { width: 760, height: 440, maxNodes: 22 },
-    { width: 400, height: 560, maxNodes: 14 },
+    { width: 400, height: 580, maxNodes: 12, labelFontSize: 14 },
   ]) {
     const layout = computeLayout(view, opts);
     assert.equal(countCollisions(layout), 0, `${opts.width}x${opts.height} 出现标签压盖`);
@@ -339,7 +337,7 @@ test('全部中心点在三档画布下均无标签压盖与越界', skipReason,
   const sizes = [
     { width: 900, height: 620, maxNodes: 34 },
     { width: 760, height: 440, maxNodes: 22 },
-    { width: 400, height: 560, maxNodes: 14 },
+    { width: 400, height: 580, maxNodes: 12, labelFontSize: 14 },
   ];
 
   for (const opts of sizes) {
