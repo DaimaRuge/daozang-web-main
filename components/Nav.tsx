@@ -10,6 +10,7 @@ const navItems = [
   { href: '/', label: '首页' },
   { href: '/catalog', label: '经文目录' },
   { href: '/search', label: '搜索' },
+  { href: '/graph', label: '关联图谱' },
   { href: '/ask', label: '智能问道' },
   { href: '/music', label: '道乐' },
   { href: '/library', label: '我的书房' },

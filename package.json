@@ -8,7 +8,8 @@
     "start": "next start",
     "lint": "eslint",
     "test": "tsx --test tests/*.test.ts",
-    "build-index": "tsx scripts/build-index.ts"
+    "build-index": "tsx scripts/build-index.ts",
+    "build-graph": "tsx scripts/build-graph.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

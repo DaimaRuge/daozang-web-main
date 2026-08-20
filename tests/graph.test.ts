@@ -1,0 +1,246 @@
+/**
+ * 知识图谱单元测试。
+ *
+ * 覆盖三条必须有回归保护的路径：
+ * 1. 多模式匹配器的「最长匹配优先」——直接决定图谱质量
+ *    （若「符籙」的每次命中都连带记一次「符」，通用词会淹没具体术语）；
+ * 2. 布局的名额分配 —— 保证条目少但可靠的关系（如目录归属）不被大组挤掉；
+ * 3. 查询层在真实产物上的行为 —— 别名简繁解析、提及边的 blockId 溯源、
+ *    以及「构建脚本不得改写原文」这条内容边界。
+ */
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'fs';
+import path from 'path';
+import { AhoCorasick } from '../lib/graph/matcher';
+import { computeLayout } from '../lib/graph/layout';
+import { GraphView, nodeId, parseNodeId } from '../lib/graph/schema';
+import {
+  expandNode,
+  graphForWork,
+  graphViewForQuery,
+  isGraphAvailable,
+  resolveQuery,
+} from '../lib/graph/query';
+
+// ---------- 匹配器 ----------
+
+test('匹配器：命中所有模式并给出正确区间', () => {
+  const ac = new AhoCorasick(['符籙', '齋醮']);
+  const hits = ac.scan('凡行符籙之法，先建齋醮');
+  assert.equal(hits.length, 2);
+  assert.equal(hits[0].patternIndex, 0);
+  assert.equal(hits[0].start, 2);
+  assert.equal(hits[0].end, 4);
+  assert.equal(hits[1].patternIndex, 1);
+});
+
+test('匹配器：最长匹配优先，短模式不在长匹配内部重复计数', () => {
+  // 「神符」与「神符籙」共存时，「神符籙」出现处只应记一次长匹配
+  const ac = new AhoCorasick(['神符', '神符籙']);
+  const hits = ac.scan('授神符籙於壇');
+  assert.equal(hits.length, 1);
+  assert.equal(hits[0].patternIndex, 1, '应命中较长的「神符籙」');
+});
+
+test('匹配器：短模式在独立出现处仍被计入', () => {
+  const ac = new AhoCorasick(['神符', '神符籙']);
+  const hits = ac.scan('神符靈驗，又受神符籙');
+  assert.equal(hits.length, 2);
+  assert.equal(hits[0].patternIndex, 0);
+  assert.equal(hits[1].patternIndex, 1);
+});
+
+test('匹配器：跨模式的部分重叠不会漏掉后一个模式', () => {
+  const ac = new AhoCorasick(['雷法', '法印']);
+  const hits = ac.scan('雷法印訣');
+  assert.ok(hits.some(h => h.patternIndex === 0), '应命中「雷法」');
+});
+
+test('匹配器：无命中时返回空数组', () => {
+  assert.deepEqual(new AhoCorasick(['符籙']).scan('清靜無為'), []);
+});
+
+// ---------- 节点 id ----------
+
+test('节点 id 拼装与解析互逆', () => {
+  const id = nodeId('work', 'abc123');
+  assert.equal(id, 'work:abc123');
+  assert.deepEqual(parseNodeId(id), { type: 'work', raw: 'abc123' });
+});
+
+test('非法节点 id 解析为 null（运行时入参不可信）', () => {
+  assert.equal(parseNodeId('不存在的类型:x'), null);
+  assert.equal(parseNodeId('work'), null);
+  assert.equal(parseNodeId(':x'), null);
+});
+
+// ---------- 布局 ----------
+
+/** 构造最小视图：一个只有 1 条的目录关系 + 一个有 30 条的提及关系 */
+function fakeView(): GraphView {
+  const center = { id: 'concept:x', type: 'concept' as const, label: '中心' };
+  const mk = (i: number) => ({
+    node: { id: `work:w${i}`, type: 'work' as const, label: `典籍${i}` },
+    edge: {
+      from: 'concept:x',
+      to: `work:w${i}`,
+      type: 'mentioned_in' as const,
+      source: 'mention' as const,
+      confidence: 0.9,
+      weight: 30 - i,
+    },
+    direction: 'out' as const,
+  });
+  return {
+    center,
+    synthetic: false,
+    groups: [
+      {
+        type: 'part_of',
+        label: '所属部类',
+        total: 1,
+        items: [
+          {
+            node: { id: 'category:正一部', type: 'category' as const, label: '正一部' },
+            edge: {
+              from: 'concept:x',
+              to: 'category:正一部',
+              type: 'part_of' as const,
+              source: 'catalog' as const,
+              confidence: 0.98,
+            },
+            direction: 'out' as const,
+          },
+        ],
+      },
+      {
+        type: 'mentioned_in',
+        label: '见于典籍',
+        total: 60,
+        items: Array.from({ length: 30 }, (_, i) => mk(i)),
+      },
+    ],
+  };
+}
+
+test('布局：节点数不超过上限', () => {
+  const layout = computeLayout(fakeView(), { maxNodes: 12 });
+  assert.ok(layout.nodes.length <= 12, `实际 ${layout.nodes.length}`);
+});
+
+test('布局：条目少的可靠关系不会被大组挤掉', () => {
+  const layout = computeLayout(fakeView(), { maxNodes: 6 });
+  assert.ok(
+    layout.nodes.some(n => n.node.id === 'category:正一部'),
+    '目录归属关系必须出现在画布上',
+  );
+});
+
+test('布局：坐标落在画布内且中心居中', () => {
+  const layout = computeLayout(fakeView(), { width: 800, height: 600 });
+  assert.equal(layout.center.x, 400);
+  assert.equal(layout.center.y, 300);
+  for (const n of layout.nodes) {
+    assert.ok(n.x >= 0 && n.x <= 800, `x 越界：${n.x}`);
+    assert.ok(n.y >= 0 && n.y <= 600, `y 越界：${n.y}`);
+  }
+});
+
+test('布局：每个分组都分到扇区标题', () => {
+  const layout = computeLayout(fakeView(), { maxNodes: 20 });
+  assert.equal(layout.sectors.length, 2);
+  assert.ok(layout.sectors.some(s => s.label === '见于典籍'));
+});
+
+// ---------- 查询层（依赖真实产物，未构建时跳过） ----------
+
+const graphReady = isGraphAvailable();
+const skipReason = { skip: graphReady ? false : '需先运行 npm run build-graph' };
+
+test('查询：简繁两种写法解析到同一实体', skipReason, () => {
+  const a = resolveQuery('符箓');
+  const b = resolveQuery('符籙');
+  assert.ok(a, '简体「符箓」应能解析');
+  assert.equal(a!.id, b!.id);
+  assert.equal(a!.type, 'concept');
+});
+
+test('查询：展开中心点得到分组关系且含原文提及', skipReason, () => {
+  const view = expandNode('concept:fulu');
+  assert.ok(view, '符籙节点应存在');
+  const mention = view!.groups.find(g => g.type === 'mentioned_in');
+  assert.ok(mention && mention.items.length > 0, '应有见于典籍的关系');
+  assert.ok(mention!.total <= 60, '提及边在构建期按上限截断');
+});
+
+test('查询：提及边的出处可定位到内容块，且引文确实含命中词', skipReason, () => {
+  const view = expandNode('concept:fulu')!;
+  const mention = view.groups.find(g => g.type === 'mentioned_in')!;
+  let checked = 0;
+  for (const item of mention.items.slice(0, 5)) {
+    const citation = item.edge.citations?.[0];
+    assert.ok(citation, `${item.node.label} 的提及边应带出处`);
+    assert.ok(citation!.blockId, '出处应含 blockId（阅读器据此深链定位）');
+    assert.ok(
+      citation!.quote && citation!.matchedTerm && citation!.quote.includes(citation!.matchedTerm),
+      `引文应包含实际命中词形：${citation!.quote} / ${citation!.matchedTerm}`,
+    );
+    // blockId 形如 {bookId}-b{序号}，必须与出处书号一致，否则深链会跳错书
+    assert.ok(citation!.blockId!.startsWith(`${citation!.bookId}-b`), citation!.blockId);
+    checked++;
+  }
+  assert.ok(checked > 0);
+});
+
+test('查询：词表未命中的检索词走回退链路仍有关系可看', skipReason, () => {
+  // 「醮壇」在词表中有实体，故取一个刻意不在词表里的组合词
+  const view = graphViewForQuery('五臟');
+  assert.ok(view, '回退链路应产出视图');
+  assert.equal(view!.synthetic, true, '应标记为合成中心点');
+  assert.ok(view!.groups.length > 0, '应至少有一组关系');
+  assert.ok(view!.note, '合成视图必须带说明，不能让用户误认为是既有实体');
+});
+
+test('查询：典籍中心点带关联文献与本书涉及的本体', skipReason, () => {
+  // 《道法會元》：符箓法术总集，关联关系应当丰富
+  const view = graphForWork('32d235d02aa0f195');
+  assert.ok(view, '该典籍节点应存在');
+  assert.ok(view!.groups.some(g => g.type === 'similar_work'), '应有关联文献');
+  assert.ok(
+    view!.groups.some(g => g.type === 'mentioned_in' && g.items[0]?.direction === 'in'),
+    '应有指向本书的提及边（即本书涉及的本体）',
+  );
+});
+
+test('查询：不存在的节点返回 null 而不抛错', skipReason, () => {
+  assert.equal(expandNode('concept:__不存在__'), null);
+  assert.equal(graphForWork('0000000000000000'), null);
+});
+
+// ---------- 内容边界 ----------
+
+test('图谱产物不包含原文全文，仅含受限长度的引文', skipReason, () => {
+  const graphPath = path.resolve(process.cwd(), 'public/data/graph.json');
+  const graph = JSON.parse(fs.readFileSync(graphPath, 'utf-8'));
+  for (const edge of graph.edges) {
+    for (const c of edge.citations ?? []) {
+      assert.ok(
+        !c.quote || c.quote.length <= 40,
+        `引文超过 40 字上限，图谱不得变相复制原文：${c.quote}`,
+      );
+    }
+  }
+});
+
+test('构建脚本对原文目录只读（源码层面不出现写入原文的调用）', () => {
+  const script = fs.readFileSync(path.resolve(process.cwd(), 'scripts/build-graph.ts'), 'utf-8');
+  const writes = script.match(/writeFileSync\([^)]*/g) ?? [];
+  assert.ok(writes.length > 0, '脚本应有写出产物的调用');
+  for (const w of writes) {
+    assert.ok(
+      !/CONTENT_DIR|INDEX_PATH/.test(w),
+      `构建脚本不得写回原文或索引：${w}`,
+    );
+  }
+});
