@@ -93,7 +93,7 @@ registerTool({
   requires: null,
   validate: input => (typeof input.query === 'string' && input.query.trim() ? null : 'query 必填'),
   async execute(input) {
-    const { results, total } = searchFullText(String(input.query), 1, 10);
+    const { results, total } = await searchFullText(String(input.query), 1, 10);
     return { total, hits: results };
   },
 });
@@ -119,7 +119,7 @@ registerTool({
     const bookId = String(input.bookId);
     const entry = getEntryById(bookId);
     if (!entry) throw new Error('典籍不存在');
-    const content = getContentById(bookId);
+    const content = await getContentById(bookId);
     const parsed = parseText(content, bookId, entry.title);
     // 输出给模型时截断，避免整本书塞进上下文
     return { toc: parsed.toc, blocks: parsed.blocks.slice(0, 200) };
@@ -299,7 +299,7 @@ registerTool({
     const bookTitle = context.reading?.bookTitle ?? '未知典籍';
     let source = typeof input.text === 'string' ? input.text.trim() : '';
     if (!source && typeof input.bookId === 'string') {
-      const content = getContentById(String(input.bookId));
+      const content = await getContentById(String(input.bookId));
       // 无划定文本时取开篇片段，避免整书塞进上下文
       source = content.slice(0, 3000);
     }

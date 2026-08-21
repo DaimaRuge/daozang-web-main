@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { queryVariants } from './zh-convert';
+import { readContent, readContentSync } from './public-data';
 
 export interface DaozangEntry {
   id: string;
@@ -47,15 +48,17 @@ export function getIndex(): DaozangIndex {
  * 读取一部典籍的原始全文（不可变底稿）。
  * 为什么放在数据层而不是 API 路由里：阅读页已改为服务端组件直接渲染正文
  * （SEO 需要服务端可读取正文），页面与 /api/entry 必须共享同一读取逻辑。
+ *
+ * 为什么是 async、且不在本文件用动态 fs 路径扫 content 目录：
+ * 见 lib/public-data.ts —— 避免 NFT 把 100MB 原文打进每个 Serverless Function。
  */
-export function getContentById(id: string): string {
-  const contentPath = path.resolve(process.cwd(), 'public/data/content', `${id}.json`);
-  try {
-    const raw = JSON.parse(fs.readFileSync(contentPath, 'utf-8'));
-    return raw.content as string;
-  } catch {
-    return '';
-  }
+export async function getContentById(id: string): Promise<string> {
+  return readContent(id);
+}
+
+/** 仅本地/脚本使用的同步读取；Vercel 函数包内通常读不到 content 目录 */
+export function getContentByIdSync(id: string): string {
+  return readContentSync(id);
 }
 
 export function getEntryById(id: string): DaozangEntry | undefined {

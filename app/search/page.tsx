@@ -45,7 +45,7 @@ export default async function SearchPage({ searchParams }: PageProps) {
   const pageSize = 20;
 
   const meta = mode === 'meta' && query ? searchEntries(query, page, pageSize) : { results: [], total: 0 };
-  const full = mode === 'full' && query ? searchFullText(query, page, pageSize) : { results: [], total: 0 };
+  const full = mode === 'full' && query ? await searchFullText(query, page, pageSize) : { results: [], total: 0 };
   const total = mode === 'full' ? full.total : meta.total;
   const totalPages = Math.ceil(total / pageSize);
 

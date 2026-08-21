@@ -34,7 +34,7 @@ export default async function ReviewPage({ searchParams }: PageProps) {
     const entry = getEntryById(book);
     if (!entry) notFound();
 
-    const parsed = parseText(getContentById(book), book, entry.title);
+    const parsed = parseText(await getContentById(book), book, entry.title);
     const bookOverrides = overrides[book] ?? {};
 
     // 审核对象：低置信度块 + 已有人工校正的块（可复查/撤销）

@@ -71,7 +71,7 @@ export function extractConcepts(question: string): string[] {
 }
 
 /** 组装参考资料：书名 + 概念级检索 + 阅读上下文，返回资料文本与引用列表 */
-function buildReferences(question: string, context: AgentContext): { text: string; citations: Citation[] } {
+async function buildReferences(question: string, context: AgentContext): Promise<{ text: string; citations: Citation[] }> {
   const citations: Citation[] = [];
   const parts: string[] = [];
   const citedBooks = new Set<string>();
@@ -82,7 +82,7 @@ function buildReferences(question: string, context: AgentContext): { text: strin
     const book = results[0];
     if (!book || citedBooks.has(book.id)) continue;
     citedBooks.add(book.id);
-    const { results: hits } = searchFullText(title.length >= 2 ? title : book.title, 1, 1);
+    const { results: hits } = await searchFullText(title.length >= 2 ? title : book.title, 1, 1);
     const snippet = hits.find(h => h.entry.id === book.id)?.snippet ?? book.preview.slice(0, 150);
     parts.push(`《${book.title}》（${book.collection} · ${book.category}）片段：${snippet}`);
     citations.push({ bookId: book.id, bookTitle: book.title, quote: snippet.slice(0, 100) });
@@ -91,7 +91,7 @@ function buildReferences(question: string, context: AgentContext): { text: strin
   // 2. 概念级检索：候选概念词做全文检索（简繁变体已在检索层处理），
   //    每个概念取命中最多的前 2 部典籍片段作为参考
   for (const concept of extractConcepts(question)) {
-    const { results: hits } = searchFullText(concept, 1, 2);
+    const { results: hits } = await searchFullText(concept, 1, 2);
     for (const hit of hits) {
       if (citedBooks.has(hit.entry.id)) continue;
       citedBooks.add(hit.entry.id);
@@ -121,7 +121,7 @@ export async function runChat(context: AgentContext): Promise<ChatResult> {
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
   if (!lastUser) throw new Error('对话中缺少用户消息');
 
-  const { text: references, citations } = buildReferences(lastUser.content, context);
+  const { text: references, citations } = await buildReferences(lastUser.content, context);
 
   const finalMessages: AgentMessage[] = [
     { role: 'system', content: CHAT_SYSTEM_PROMPT + (references ? `\n\n参考资料：\n${references}` : '') },
@@ -142,7 +142,7 @@ export async function* runChatStream(
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
   if (!lastUser) throw new Error('对话中缺少用户消息');
 
-  const { text: references, citations } = buildReferences(lastUser.content, context);
+  const { text: references, citations } = await buildReferences(lastUser.content, context);
   const finalMessages: AgentMessage[] = [
     { role: 'system', content: CHAT_SYSTEM_PROMPT + (references ? `\n\n参考资料：\n${references}` : '') },
     ...messages.slice(-10).map(m => ({ role: m.role, content: m.content })),

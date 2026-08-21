@@ -1,23 +1,27 @@
 /**
- * 知识图谱构建脚本 —— 全库跑批，产出 public/data/graph.json。
+ * 知识图谱构建脚本 —— 全库跑批，产出 public/data/graph.json.gz。
  *
  * 运行：npm run build-graph  [-- --limit=50]（--limit 仅用于本地快速验证）
  *
  * 为什么在构建期算而不是运行时算：
  * 1. 提及扫描要读完 1504 部约 3500 万字，运行时绝无可能；
- * 2. 产物是纯静态 JSON，可随 public/data 一起提交与分发，
+ * 2. 产物是 gzip 压缩的静态 JSON（public/data/graph.json.gz）。
+ *    明文约 14MB，超过 Vercel 函数包单文件安全阈值；gzip 后约 3MB，
+ *    语义不变，运行时由 lib/graph/load.ts 解压。不写明文 graph.json，
+ *    避免仓库与部署同时带上超限文件。
  *    生产环境无持久盘（见 docs/PRD-v2.1-GAP-STATUS.md），不能依赖运行时数据库；
  * 3. 图谱可复现：同一份词表 + 同一份原文 → 同一份图谱，便于回归对比。
  *
  * 内容边界（硬约束）：本脚本对 public/data/content 只读，绝不写回原文；
  * 每条边都带 source 与 confidence，提及边带可点回原文的 blockId 出处。
  *
- * 为什么产物是「一个文件」而不是每节点一个文件：按下面的截断策略，
+ * 为什么产物是「一个 gzip 文件」而不是每节点一个文件：按下面的截断策略，
  * 全图规模与 index.json 同量级，运行时按模块级缓存读一次即可；
  * 而 public/data 已有 1500+ 文件，再加数千个碎文件只会拖慢 git 与部署。
  */
 import * as fs from 'fs';
 import * as path from 'path';
+import { gzipSync } from 'zlib';
 import { parseText } from '../lib/text-parser';
 import { AhoCorasick } from '../lib/graph/matcher';
 import {
@@ -39,7 +43,8 @@ const CONTENT_DIR = path.join(ROOT, 'public/data/content');
 const GAZETTEER_PATH = path.join(ROOT, 'data/graph/gazetteer.json');
 const AUTO_TERMS_PATH = path.join(ROOT, 'data/graph/terms.auto.json');
 const RITUAL_ILLUS_PATH = path.join(ROOT, 'data/ritual-illustrations.json');
-const OUT_PATH = path.join(ROOT, 'public/data/graph.json');
+const OUT_PATH = path.join(ROOT, 'public/data/graph.json.gz');
+const OUT_PATH_PLAIN = path.join(ROOT, 'public/data/graph.json');
 
 // ---------- 截断参数：决定产物大小与「图不倾倒」的体验 ----------
 
@@ -625,7 +630,10 @@ function main(): void {
     aliasIndex,
   };
 
-  fs.writeFileSync(OUT_PATH, JSON.stringify(graph), 'utf-8');
+  const json = JSON.stringify(graph);
+  fs.writeFileSync(OUT_PATH, gzipSync(Buffer.from(json)));
+  // 部署包里不能同时留一份超 10MB 的明文，旧产物一律去掉
+  if (fs.existsSync(OUT_PATH_PLAIN)) fs.unlinkSync(OUT_PATH_PLAIN);
 
   const sizeMb = fs.statSync(OUT_PATH).size / 1024 / 1024;
   const byType = new Map<GraphNodeType, number>();

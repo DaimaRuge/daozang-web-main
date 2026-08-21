@@ -27,6 +27,6 @@ export async function GET(request: Request) {
     return NextResponse.json({ entry: adj ? { id: adj.id, title: adj.title } : null });
   }
 
-  const content = getContentById(id) || '[无法读取文件内容]';
+  const content = (await getContentById(id)) || '[无法读取文件内容]';
   return NextResponse.json({ entry, content });
 }

@@ -41,7 +41,7 @@ export default async function TextPage({ params }: PageProps) {
   const entry = getEntryById(id);
   if (!entry) notFound();
 
-  const content = getContentById(id);
+  const content = await getContentById(id);
   // 规则解析 → 人工校正 → 科仪示意图注入（均在服务端完成，正文 SSR 可读）
   const parsed = injectRitualIllustrations(
     applyOverrides(parseText(content, id, entry.title)),

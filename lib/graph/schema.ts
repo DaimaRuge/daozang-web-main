@@ -129,7 +129,7 @@ export interface GraphEdge {
   citations?: GraphCitation[];
 }
 
-/** 构建产物（public/data/graph.json）。运行时只读，模块级缓存。 */
+/** 构建产物（public/data/graph.json.gz）。运行时只读，模块级缓存。 */
 export interface KnowledgeGraph {
   version: number;
   buildTime: string;

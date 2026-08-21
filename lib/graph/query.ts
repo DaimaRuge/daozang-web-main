@@ -6,16 +6,14 @@
  * 用户真正需要的是「从我关心的这一点向外走一跳」。故本模块只提供
  * 三种入口：按词解析中心点、按中心点展开一跳、以及某部典籍的邻域。
  *
- * 为什么图谱产物整体载入内存：产物约十余 MB，
+ * 为什么图谱产物整体载入内存：gzip 后约 3MB、解压后十余 MB，
  * 与 lib/data.ts 的做法一致（模块级缓存，每进程一次）；
- * 这样避免了给 public/data 再添数千个碎文件。
+ * 明文不进仓库，避免超过 Vercel 函数包单文件上限。
  *
  * 内容边界：本模块不生成任何解释性文字，只搬运构建期产物中已带
  * source / confidence / citations 的边，让 UI 能如实告知「凭什么这么连」。
  */
 
-import fs from 'fs';
-import path from 'path';
 import {
   EDGE_LABELS,
   GraphEdge,
@@ -26,9 +24,9 @@ import {
   RelatedItem,
   RelationGroup,
 } from './schema';
+import { graphArtifactExists, loadKnowledgeGraph } from './load';
 import { queryVariants } from '../zh-convert';
 import { getEntryById, searchEntries } from '../data';
-import { searchFullText } from '../fulltext-search';
 
 /** 每个关系分组默认展示条数：够看出结构，又不至于把屏幕铺满 */
 const DEFAULT_GROUP_LIMIT = 12;
@@ -49,14 +47,12 @@ let _runtime: GraphRuntime | null | undefined;
 function getRuntime(): GraphRuntime | null {
   if (_runtime !== undefined) return _runtime;
 
-  const graphPath = path.resolve(process.cwd(), 'public/data/graph.json');
-  if (!fs.existsSync(graphPath)) {
-    console.warn('[graph] public/data/graph.json 不存在，请先运行 npm run build-graph');
+  const graph = loadKnowledgeGraph();
+  if (!graph) {
+    console.warn('[graph] 图谱产物不存在，请先运行 npm run build-graph');
     _runtime = null;
     return null;
   }
-
-  const graph = JSON.parse(fs.readFileSync(graphPath, 'utf-8')) as KnowledgeGraph;
   const nodeById = new Map(graph.nodes.map(n => [n.id, n]));
   const adjacency = new Map<string, GraphEdge[]>();
   for (const edge of graph.edges) {
@@ -73,7 +69,7 @@ function getRuntime(): GraphRuntime | null {
 
 /** 图谱是否可用（UI 据此决定是否渲染入口，而不是渲染一个空面板） */
 export function isGraphAvailable(): boolean {
-  return getRuntime() !== null;
+  return graphArtifactExists() && getRuntime() !== null;
 }
 
 export function getGraphStats(): KnowledgeGraph['stats'] | null {
@@ -220,8 +216,11 @@ export function graphForWork(bookId: string, groupLimit = DEFAULT_GROUP_LIMIT): 
  * 这样冷僻词（如「醮壇」之外的偏门术语）不必先进词表也能看到关系，
  * 图谱因此覆盖全库而不是只覆盖策展过的那几十个词。
  *
- * 为什么先用书名检索再退到全文：全文检索需要把约 97MB 语料读进内存
- * （见 lib/fulltext-search.ts 的取舍说明），能省则省。
+ * 为什么先用书名检索、不再从本模块调用全文检索：
+ * 全文检索要把约 97MB 语料读进内存（见 lib/fulltext-search.ts），
+ * 且 query.ts 一旦 import 该模块，NFT 会把整库 content JSON 打进图谱相关
+ * 的 Serverless Function，Vercel 预览部署会因函数体积失败。
+ * 冷僻词请走 /search?mode=full；图谱回退只基于书名命中反向汇总。
  */
 export function relatedByKeyword(query: string, groupLimit = DEFAULT_GROUP_LIMIT): GraphView | null {
   const rt = getRuntime();
@@ -230,10 +229,7 @@ export function relatedByKeyword(query: string, groupLimit = DEFAULT_GROUP_LIMIT
   if (!q) return null;
 
   const byTitle = searchEntries(q, 1, groupLimit);
-  const workIds =
-    byTitle.total > 0
-      ? byTitle.results.map(e => e.id)
-      : searchFullText(q, 1, groupLimit).results.map(h => h.entry.id);
+  const workIds = byTitle.results.map(e => e.id);
 
   if (workIds.length === 0) return null;
 

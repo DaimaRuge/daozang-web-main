@@ -54,7 +54,7 @@ git clone https://github.com/DaimaRuge/daozang-text.git data/daozang-text
 # 构建数据索引
 npm run build-index
 
-# 构建知识图谱（读 public/data，约数秒；产物 public/data/graph.json）
+# 构建知识图谱（读 public/data，约数秒；产物 public/data/graph.json.gz）
 npm run build-graph
 
 # 从语料自动抽取术语（约 1 分钟；产物 data/graph/terms.auto.json，随后需再跑 build-graph）

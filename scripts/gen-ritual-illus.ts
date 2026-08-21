@@ -10,7 +10,7 @@
 import { execSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { getContentById, getEntryById } from '../lib/data';
+import { getContentByIdSync, getEntryById } from '../lib/data';
 import { parseText } from '../lib/text-parser';
 import { overrideKey } from '../lib/parser-overrides';
 import { RitualIllustrationsFile } from '../lib/ritual-illustrations';
@@ -82,7 +82,7 @@ async function main() {
   const entry = getEntryById(bookId);
   if (!entry) throw new Error(`book not found: ${bookId}`);
 
-  const content = getContentById(bookId);
+  const content = getContentByIdSync(bookId);
   const parsed = parseText(content, bookId, entry.title);
 
   const anchors = parsed.blocks.filter(b => isRitualAnchor(b.content, b.type)).slice(0, max);

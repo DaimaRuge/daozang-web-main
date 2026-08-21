@@ -17,7 +17,7 @@ export async function GET(req: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ error: 'invalid page_num' }, { status: 400 });
   }
 
-  const data = getBookPages(id);
+  const data = await getBookPages(id);
   if (!data) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
   const { parsed, pages } = data;

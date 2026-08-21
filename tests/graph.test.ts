@@ -28,6 +28,7 @@ import {
   isGraphAvailable,
   resolveQuery,
 } from '../lib/graph/query';
+import { GRAPH_ARTIFACT_MAX_BYTES, loadKnowledgeGraph } from '../lib/graph/load';
 
 // ---------- 匹配器 ----------
 
@@ -330,9 +331,8 @@ test('查询：不存在的节点返回 null 而不抛错', skipReason, () => {
 });
 
 test('查询：自动抽取节点若存在则不带编造释义', skipReason, () => {
-  const graph = JSON.parse(
-    fs.readFileSync(path.resolve(process.cwd(), 'public/data/graph.json'), 'utf-8'),
-  );
+  const graph = loadKnowledgeGraph();
+  assert.ok(graph, '图谱产物应可加载');
   const autos = graph.nodes.filter((n: { origin?: string }) => n.origin === 'auto');
   for (const n of autos) {
     assert.ok(!n.shortDef, `自动节点不得带释义：${n.id}`);
@@ -358,9 +358,8 @@ test('查询：对称关系合并为单一分组且邻居不重复', skipReason,
 test('全部中心点在三档画布下均无标签压盖与越界', skipReason, () => {
   // 图谱有近两千个节点，任何一个都可能被用户点成中心点，
   // 因此这条不变量必须对全图成立，而不是抽查几个
-  const graph = JSON.parse(
-    fs.readFileSync(path.resolve(process.cwd(), 'public/data/graph.json'), 'utf-8'),
-  );
+  const graph = loadKnowledgeGraph();
+  assert.ok(graph, '图谱产物应可加载');
   const sizes = [
     { width: 900, height: 620, maxNodes: 34 },
     { width: 760, height: 440, maxNodes: 22 },
@@ -391,9 +390,24 @@ test('全部中心点在三档画布下均无标签压盖与越界', skipReason,
 
 // ---------- 内容边界 ----------
 
+test('图谱产物单文件不超过 Vercel 函数安全阈值', skipReason, () => {
+  // Vercel 对打进 Serverless Function 的单文件有约 10MB 的历史上限；
+  // 未压缩的 graph.json 在并入自动术语后超过该阈值，预览部署会直接失败。
+  const dir = path.resolve(process.cwd(), 'public/data');
+  const artifacts = fs.readdirSync(dir).filter(f => f.startsWith('graph'));
+  assert.ok(artifacts.length > 0, '应存在图谱产物');
+  for (const name of artifacts) {
+    const bytes = fs.statSync(path.join(dir, name)).size;
+    assert.ok(
+      bytes <= GRAPH_ARTIFACT_MAX_BYTES,
+      `${name} 为 ${(bytes / 1024 / 1024).toFixed(2)}MB，超过 ${(GRAPH_ARTIFACT_MAX_BYTES / 1024 / 1024).toFixed(0)}MB 上限`,
+    );
+  }
+});
+
 test('图谱产物不包含原文全文，仅含受限长度的引文', skipReason, () => {
-  const graphPath = path.resolve(process.cwd(), 'public/data/graph.json');
-  const graph = JSON.parse(fs.readFileSync(graphPath, 'utf-8'));
+  const graph = loadKnowledgeGraph();
+  assert.ok(graph);
   for (const edge of graph.edges) {
     for (const c of edge.citations ?? []) {
       assert.ok(

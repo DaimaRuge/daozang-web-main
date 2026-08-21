@@ -63,7 +63,7 @@ flowchart LR
   auto --> build
   idx["public/data/index.json 目录"] --> build
   content --> build
-  build --> artifact["public/data/graph.json 单一产物"]
+  build --> artifact["public/data/graph.json.gz 单一产物"]
   artifact --> query["lib/graph/query.ts 只读查询"]
   query --> search["搜索页折叠面板"]
   query --> page["/graph 页"]
@@ -74,7 +74,7 @@ flowchart LR
 | 关注点 | 决策与理由 |
 |---|---|
 | 计算时机 | 构建期（`npm run build-graph`，全库约 2s）。运行时扫不动 3500 万字，且生产无持久盘，不能依赖数据库 |
-| 产物形态 | 单一 `public/data/graph.json`（约 13.5MB，含自动抽取节点），模块级缓存。不用「每节点一文件」：`public/data` 已有 1500+ 文件，再加数千碎文件只拖慢 git 与部署 |
+| 产物形态 | 单一 `public/data/graph.json.gz`（gzip 后约 3MB；明文会超过 Vercel 函数包单文件上限），模块级缓存。不用「每节点一文件」：`public/data` 已有 1500+ 文件，再加数千碎文件只拖慢 git 与部署 |
 | 提及扫描 | Aho-Corasick（`lib/graph/matcher.ts`）。上千别名 × 3500 万字若逐词 `indexOf` 是数百亿次比较；自动机压成一遍扫描，最长匹配优先以免通用词淹没具体术语 |
 | 出处溯源 | 提及边存 `blockId`，借阅读器既有的 `#blockId` 深链（分页大部头会先翻页再闪烁）落到出现该词的那一段 |
 | 关系强弱 | 每条边带 `source` 与 `confidence`；共现按 Jaccard 排序而非原始次数（否则邻居全是「無為」「長生」等泛词）；低于 `LOW_CONFIDENCE` 的边 UI 标「待考」 |
@@ -148,7 +148,7 @@ npm run lint         # ESLint
 npm test             # 解析器 / 检索 / 图谱 / 术语抽取单测
 npm run build-index  # 从 data/daozang-text/*.txt 重建索引与内容 JSON
 npm run extract-terms # 从语料自动发现术语 → data/graph/terms.auto.json
-npm run build-graph  # 合并策展词与自动术语，重建 public/data/graph.json
+npm run build-graph  # 合并策展词与自动术语，重建 public/data/graph.json.gz
 ```
 
 环境变量（均为可选，仅服务端）：
