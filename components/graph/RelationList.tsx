@@ -3,6 +3,7 @@ import { LOW_CONFIDENCE } from '@/lib/content-schema';
 import {
   EDGE_SOURCE_LABELS,
   GraphView,
+  NODE_ORIGIN_LABELS,
   NODE_TYPE_LABELS,
   RelatedItem,
 } from '@/lib/graph/schema';
@@ -61,6 +62,11 @@ export default function RelationList({ view }: { view: GraphView }) {
                       <span className="text-[10px] text-[var(--muted)] px-1.5 py-0.5 border border-[var(--border)] rounded">
                         {NODE_TYPE_LABELS[item.node.type]}
                       </span>
+                      {item.node.origin === 'auto' && (
+                        <span className="text-[10px] text-[var(--cinnabar)] px-1.5 py-0.5 border border-[var(--border)] rounded">
+                          {NODE_ORIGIN_LABELS.auto}
+                        </span>
+                      )}
                       {item.edge.weight != null && item.edge.type === 'mentioned_in' && (
                         <span className="text-[10px] text-[var(--muted)]">{item.edge.weight} 处</span>
                       )}
@@ -85,7 +91,9 @@ export default function RelationList({ view }: { view: GraphView }) {
                     {item.node.shortDef && !citation?.quote && (
                       <p className="text-xs text-[var(--muted)] mt-1 leading-relaxed">
                         {item.node.shortDef}
-                        <span className="ml-1 text-[10px]">（词表释义）</span>
+                        {item.node.origin !== 'auto' && item.node.origin !== 'query' && (
+                          <span className="ml-1 text-[10px]">（词表释义）</span>
+                        )}
                       </p>
                     )}
                   </Link>

@@ -6,7 +6,7 @@ import {
   graphViewForQuery,
   isGraphAvailable,
 } from '@/lib/graph/query';
-import { NODE_TYPE_LABELS } from '@/lib/graph/schema';
+import { NODE_ORIGIN_LABELS, NODE_TYPE_LABELS } from '@/lib/graph/schema';
 import GraphExplorer from '@/components/graph/GraphExplorer';
 
 /**
@@ -114,7 +114,9 @@ export default async function GraphPage({ searchParams }: PageProps) {
               {stats.edges.toLocaleString('zh-CN')} 条关系，
               由 {stats.works.toLocaleString('zh-CN')} 部典籍、约
               {(stats.scannedChars / 1e6).toFixed(1)} 百万字原文扫描而成。
-              关系分为目录事实、词表策展、原文提及与统计推算四类，界面上均如实标注。
+              词表来自人工策展
+              {stats.autoEntities ? `与自动抽取（${stats.autoEntities.toLocaleString('zh-CN')} 条）` : ''}
+              ；关系分为目录事实、词表策展、原文提及与统计推算，界面上均如实标注。
             </p>
           )}
         </section>
@@ -127,6 +129,11 @@ export default async function GraphPage({ searchParams }: PageProps) {
             <span className="text-[10px] text-[var(--muted)] px-1.5 py-0.5 border border-[var(--border)] rounded">
               {NODE_TYPE_LABELS[view.center.type]}
             </span>
+            {view.center.origin === 'auto' && (
+              <span className="text-[10px] text-[var(--cinnabar)] px-1.5 py-0.5 border border-[var(--border)] rounded">
+                {NODE_ORIGIN_LABELS.auto}
+              </span>
+            )}
             {view.center.works != null && (
               <span className="text-xs text-[var(--muted)]">全库 {view.center.works} 部典籍提及</span>
             )}
@@ -135,7 +142,14 @@ export default async function GraphPage({ searchParams }: PageProps) {
           {view.center.shortDef && (
             <p className="text-sm text-[var(--text-secondary)] leading-relaxed mb-1 max-w-2xl">
               {view.center.shortDef}
-              {!view.synthetic && <span className="ml-1 text-[10px] text-[var(--muted)]">（词表释义，非典籍原文）</span>}
+              {!view.synthetic && view.center.origin !== 'auto' && (
+                <span className="ml-1 text-[10px] text-[var(--muted)]">（词表释义，非典籍原文）</span>
+              )}
+            </p>
+          )}
+          {view.center.origin === 'auto' && (
+            <p className="text-xs text-[var(--muted)] leading-relaxed mb-1">
+              由语料统计自动识别，无词表释义；典籍数与原文出处即其证据。
             </p>
           )}
           {view.note && <p className="text-xs text-[var(--muted)] mb-4">{view.note}</p>}

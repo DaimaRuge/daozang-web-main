@@ -6,7 +6,7 @@
  * 用户真正需要的是「从我关心的这一点向外走一跳」。故本模块只提供
  * 三种入口：按词解析中心点、按中心点展开一跳、以及某部典籍的邻域。
  *
- * 为什么图谱产物整体载入内存：产物与 index.json 同量级（约 5MB），
+ * 为什么图谱产物整体载入内存：产物约十余 MB，
  * 与 lib/data.ts 的做法一致（模块级缓存，每进程一次）；
  * 这样避免了给 public/data 再添数千个碎文件。
  *
@@ -241,6 +241,7 @@ export function relatedByKeyword(query: string, groupLimit = DEFAULT_GROUP_LIMIT
     id: `concept:__query__${q}`,
     type: 'concept',
     label: q,
+    origin: 'query',
     shortDef: '检索词。图谱词表中暂无此实体，以下关系由命中典籍反向汇总得出。',
   };
 

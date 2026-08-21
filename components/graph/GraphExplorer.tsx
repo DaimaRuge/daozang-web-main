@@ -8,6 +8,7 @@ import {
   graphHrefForView,
   GraphNode,
   GraphView,
+  NODE_ORIGIN_LABELS,
   NODE_TYPE_LABELS,
   RelatedItem,
 } from '@/lib/graph/schema';
@@ -107,6 +108,11 @@ export default function GraphExplorer({
                   <span className="text-[10px] text-[var(--muted)] px-1.5 py-0.5 border border-[var(--border)] rounded">
                     {NODE_TYPE_LABELS[selected.type]}
                   </span>
+                  {selected.origin === 'auto' && (
+                    <span className="text-[10px] text-[var(--cinnabar)] px-1.5 py-0.5 border border-[var(--border)] rounded">
+                      {NODE_ORIGIN_LABELS.auto}
+                    </span>
+                  )}
                 </div>
 
                 <p className="text-xs text-[var(--muted)] mb-2">
@@ -121,7 +127,14 @@ export default function GraphExplorer({
                 {selected.shortDef && (
                   <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-2">
                     {selected.shortDef}
-                    <span className="ml-1 text-[10px] text-[var(--muted)]">（词表释义，非典籍原文）</span>
+                    {selected.origin !== 'auto' && selected.origin !== 'query' && (
+                      <span className="ml-1 text-[10px] text-[var(--muted)]">（词表释义，非典籍原文）</span>
+                    )}
+                  </p>
+                )}
+                {selected.origin === 'auto' && !selected.shortDef && (
+                  <p className="text-xs text-[var(--muted)] leading-relaxed mb-2">
+                    由语料统计自动识别，无词表释义。下方出处与典籍数为证据，不是词典定义。
                   </p>
                 )}
 

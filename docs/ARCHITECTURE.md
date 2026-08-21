@@ -56,9 +56,13 @@ tests/                  单元测试（解析器/检索/人工校正层）
 
 ```mermaid
 flowchart LR
-  gaz["data/graph/gazetteer.json 策展词表"] --> build["scripts/build-graph.ts"]
+  content["public/data/content 原文（只读）"] --> extract["scripts/extract-terms.ts"]
+  gaz["data/graph/gazetteer.json 策展词表"] --> extract
+  extract --> auto["data/graph/terms.auto.json 自动术语"]
+  gaz --> build["scripts/build-graph.ts"]
+  auto --> build
   idx["public/data/index.json 目录"] --> build
-  content["public/data/content 原文（只读）"] --> build
+  content --> build
   build --> artifact["public/data/graph.json 单一产物"]
   artifact --> query["lib/graph/query.ts 只读查询"]
   query --> search["搜索页折叠面板"]
@@ -70,12 +74,13 @@ flowchart LR
 | 关注点 | 决策与理由 |
 |---|---|
 | 计算时机 | 构建期（`npm run build-graph`，全库约 2s）。运行时扫不动 3500 万字，且生产无持久盘，不能依赖数据库 |
-| 产物形态 | 单一 `public/data/graph.json`（约 4.8MB，与 index.json 同量级），模块级缓存。不用「每节点一文件」：`public/data` 已有 1500+ 文件，再加数千碎文件只拖慢 git 与部署 |
+| 产物形态 | 单一 `public/data/graph.json`（约 13.5MB，含自动抽取节点），模块级缓存。不用「每节点一文件」：`public/data` 已有 1500+ 文件，再加数千碎文件只拖慢 git 与部署 |
 | 提及扫描 | Aho-Corasick（`lib/graph/matcher.ts`）。上千别名 × 3500 万字若逐词 `indexOf` 是数百亿次比较；自动机压成一遍扫描，最长匹配优先以免通用词淹没具体术语 |
 | 出处溯源 | 提及边存 `blockId`，借阅读器既有的 `#blockId` 深链（分页大部头会先翻页再闪烁）落到出现该词的那一段 |
 | 关系强弱 | 每条边带 `source` 与 `confidence`；共现按 Jaccard 排序而非原始次数（否则邻居全是「無為」「長生」等泛词）；低于 `LOW_CONFIDENCE` 的边 UI 标「待考」 |
 | 找关联文献 | 典籍间 `similar_work` 边由共享概念的 IDF 加权余弦算出，通用概念按文档频率剔除 |
-| 全库覆盖 | 词表未命中的检索词走「关键词 → 命中典籍 → 其概念边」回退链路，使任意冷僻词都有关系可看，而非只覆盖策展过的词 |
+| 词表双来源 | ① 人工策展 `gazetteer.json`（带释义）；② 语料统计自动抽取 `terms.auto.json`（`npm run extract-terms`，无释义）。查询未命中实体时还有第三条路径：关键词 → 命中典籍 → 其概念边 |
+| 自动抽取 | n-gram + 凝固度/左右熵/部类偏离 + 逻辑回归（策展词为正例，L2 防饱和）。自动节点标「自动抽取」，只用频次与原文出处作证据，不编造 shortDef |
 | 可视化 | 分扇区径向布局（`lib/graph/layout.ts`，纯函数、SSR 与客户端一致），不引图布局库；标签做确定性碰撞避让，并有等价的关系列表视图承担无障碍与无 JS 场景 |
 
 ### Web as Agent 数据流
@@ -140,8 +145,10 @@ npm run dev          # 开发
 npm run build        # 构建
 npm start            # 生产运行
 npm run lint         # ESLint
-npm test             # 解析器单测
+npm test             # 解析器 / 检索 / 图谱 / 术语抽取单测
 npm run build-index  # 从 data/daozang-text/*.txt 重建索引与内容 JSON
+npm run extract-terms # 从语料自动发现术语 → data/graph/terms.auto.json
+npm run build-graph  # 合并策展词与自动术语，重建 public/data/graph.json
 ```
 
 环境变量（均为可选，仅服务端）：

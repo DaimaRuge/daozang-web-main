@@ -21,6 +21,7 @@ import * as path from 'path';
 import { parseText } from '../lib/text-parser';
 import { AhoCorasick } from '../lib/graph/matcher';
 import {
+  AutoTermsFile,
   GazetteerEntry,
   GraphEdge,
   GraphNode,
@@ -36,6 +37,7 @@ const ROOT = path.resolve(__dirname, '..');
 const INDEX_PATH = path.join(ROOT, 'public/data/index.json');
 const CONTENT_DIR = path.join(ROOT, 'public/data/content');
 const GAZETTEER_PATH = path.join(ROOT, 'data/graph/gazetteer.json');
+const AUTO_TERMS_PATH = path.join(ROOT, 'data/graph/terms.auto.json');
 const RITUAL_ILLUS_PATH = path.join(ROOT, 'data/ritual-illustrations.json');
 const OUT_PATH = path.join(ROOT, 'public/data/graph.json');
 
@@ -43,6 +45,10 @@ const OUT_PATH = path.join(ROOT, 'public/data/graph.json');
 
 /** 每个实体最多保留多少条「见于典籍」边（其余只计入总数） */
 const MAX_MENTIONS_PER_ENTITY = 60;
+/** 自动抽取实体的提及边更狠地截断：它们数量大，样本够用即可 */
+const MAX_MENTIONS_PER_AUTO_ENTITY = 20;
+/** 并入图谱的自动术语上限：控制产物体积与画面噪声 */
+const MAX_AUTO_TERMS = 800;
 /** 每条提及边保留的出处样本数 */
 const MAX_CITATIONS_PER_EDGE = 2;
 /** 出处引文截断长度：只为定位与预览，不做原文再分发 */
@@ -152,6 +158,7 @@ function main(): void {
       label: g.label,
       aliases: g.aliases,
       shortDef: g.shortDef,
+      origin: 'curated',
     });
     addAlias(g.label, id);
     for (const a of g.aliases) addAlias(a, id);
@@ -238,23 +245,79 @@ function main(): void {
     }
   }
 
+  // ---------- 2b. 自动抽取术语（与策展词表合并，已有实体不重复建节点） ----------
+  //
+  // 词表有两个来源：人工策展覆盖核心语义域，自动抽取从 3500 万字里长出其余术语。
+  // 自动术语不得编造 shortDef，只用 label 参与扫描；提及边截断更狠以控制体积。
+  const autoEntityIds = new Set<string>();
+  let autoMerged = 0;
+  if (fs.existsSync(AUTO_TERMS_PATH)) {
+    const autoFile = readJson<AutoTermsFile>(AUTO_TERMS_PATH);
+    const unused = autoFile.terms.filter(t => !aliasIndex[t.term]);
+    const byType = new Map<string, typeof unused>();
+    for (const t of unused) {
+      const list = byType.get(t.type) ?? [];
+      list.push(t);
+      byType.set(t.type, list);
+    }
+    for (const list of byType.values()) {
+      list.sort((a, b) => b.score - a.score || b.docFreq - a.docFreq);
+    }
+    // 山川构词会捞出大量「某山」，按类型封顶，以免占尽自动名额
+    const typeCap: Record<string, number> = {
+      place: 50,
+      person: 80,
+      deity: 120,
+      ritual: 40,
+      sect: 30,
+    };
+    const picked: typeof unused = [];
+    for (const [type, cap] of Object.entries(typeCap)) {
+      picked.push(...(byType.get(type) ?? []).slice(0, cap));
+    }
+    const rest = Math.max(0, MAX_AUTO_TERMS - picked.length);
+    picked.push(...(byType.get('concept') ?? []).slice(0, rest));
+    for (const t of picked) {
+      if (aliasIndex[t.term]) continue;
+      const id = nodeId(t.type, `auto-${t.term}`);
+      if (nodes.has(id)) continue;
+      addNode({
+        id,
+        type: t.type,
+        label: t.term,
+        origin: 'auto',
+        // 故意不写 shortDef：自动抽取只有统计证据，释义由策展词表承担
+      });
+      addAlias(t.term, id);
+      autoEntityIds.add(id);
+      autoMerged++;
+    }
+    console.log(
+      `自动术语 ${autoFile.terms.length} 条 → 去重后 ${unused.length} → 并入 ${autoMerged}（上限 ${MAX_AUTO_TERMS}）`,
+    );
+  } else {
+    console.log('未找到 data/graph/terms.auto.json，图谱仅含策展词表（可运行 npm run extract-terms）');
+  }
+
   // ---------- 3. 全库提及扫描 ----------
 
   /** 模式表：patternIndex → 实体节点 id */
   const patterns: string[] = [];
   const patternOwner: string[] = [];
-  for (const g of gazetteer.entries) {
-    const id = gazNodeId.get(g.id)!;
-    const forms = new Set<string>([g.label, ...g.aliases]);
+  for (const node of nodes.values()) {
+    if (node.origin !== 'curated' && node.origin !== 'auto') continue;
+    const forms = new Set<string>([node.label, ...(node.aliases ?? [])]);
     for (const f of forms) {
       // 单字模式在文言语料里噪声极大（「道」「符」），一律不参与扫描
       if (f.length < 2) continue;
       patterns.push(f);
-      patternOwner.push(id);
+      patternOwner.push(node.id);
     }
   }
   const automaton = new AhoCorasick(patterns);
-  console.log(`词表实体 ${gazetteer.entries.length} 个，扫描模式 ${patterns.length} 个`);
+  console.log(
+    `扫描实体 ${gazetteer.entries.length} 策展 + ${autoMerged} 自动，模式 ${patterns.length} 个`,
+  );
 
   /** 实体 → (典籍 id → 提及统计) */
   const mentions = new Map<string, Map<string, MentionStat>>();
@@ -341,7 +404,8 @@ function main(): void {
     const node = nodes.get(entityId);
     if (node) node.works = ranked.length;
 
-    for (const { bookId, stat } of ranked.slice(0, MAX_MENTIONS_PER_ENTITY)) {
+    const cap = autoEntityIds.has(entityId) ? MAX_MENTIONS_PER_AUTO_ENTITY : MAX_MENTIONS_PER_ENTITY;
+    for (const { bookId, stat } of ranked.slice(0, cap)) {
       const entry = entries.find(x => x.id === bookId);
       if (!entry) continue;
       // 命中次数越多越可能是实质论述而非偶然用字；标题命中直接给高置信度
@@ -551,7 +615,8 @@ function main(): void {
       nodes: nodes.size,
       edges: edges.length,
       works: entries.length,
-      entities: gazetteer.entries.length,
+      entities: gazetteer.entries.length + autoMerged,
+      autoEntities: autoMerged,
       scannedChars,
       buildMs: Date.now() - started,
     },

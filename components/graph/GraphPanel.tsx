@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
-import { graphHrefForView, GraphView, NODE_TYPE_LABELS } from '@/lib/graph/schema';
+import { graphHrefForView, GraphView, NODE_ORIGIN_LABELS, NODE_TYPE_LABELS } from '@/lib/graph/schema';
 import GraphExplorer from './GraphExplorer';
 
 /**
@@ -45,6 +45,11 @@ export default function GraphPanel({ view }: { view: GraphView }) {
             <span className="text-[10px] text-[var(--muted)] px-1.5 py-0.5 border border-[var(--border)] rounded">
               {NODE_TYPE_LABELS[view.center.type]}
             </span>
+            {view.center.origin === 'auto' && (
+              <span className="text-[10px] text-[var(--cinnabar)] px-1.5 py-0.5 border border-[var(--border)] rounded">
+                {NODE_ORIGIN_LABELS.auto}
+              </span>
+            )}
           </span>
           {preview.length > 0 && (
             <span className="block text-xs text-[var(--muted)] mt-1 leading-relaxed line-clamp-2">
@@ -60,7 +65,14 @@ export default function GraphPanel({ view }: { view: GraphView }) {
           {view.center.shortDef && (
             <p className="text-xs text-[var(--text-secondary)] leading-relaxed mb-3">
               {view.center.shortDef}
-              {!view.synthetic && <span className="ml-1 text-[10px] text-[var(--muted)]">（词表释义，非典籍原文）</span>}
+              {!view.synthetic && view.center.origin !== 'auto' && (
+                <span className="ml-1 text-[10px] text-[var(--muted)]">（词表释义，非典籍原文）</span>
+              )}
+            </p>
+          )}
+          {view.center.origin === 'auto' && (
+            <p className="text-xs text-[var(--muted)] leading-relaxed mb-3">
+              由语料统计自动识别，无词表释义。
             </p>
           )}
           <GraphExplorer view={view} variant="compact" />

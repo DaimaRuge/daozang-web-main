@@ -329,6 +329,19 @@ test('查询：不存在的节点返回 null 而不抛错', skipReason, () => {
   assert.equal(graphForWork('0000000000000000'), null);
 });
 
+test('查询：自动抽取节点若存在则不带编造释义', skipReason, () => {
+  const graph = JSON.parse(
+    fs.readFileSync(path.resolve(process.cwd(), 'public/data/graph.json'), 'utf-8'),
+  );
+  const autos = graph.nodes.filter((n: { origin?: string }) => n.origin === 'auto');
+  for (const n of autos) {
+    assert.ok(!n.shortDef, `自动节点不得带释义：${n.id}`);
+  }
+  if (graph.stats.autoEntities) {
+    assert.equal(autos.length, graph.stats.autoEntities);
+  }
+});
+
 test('查询：对称关系合并为单一分组且邻居不重复', skipReason, () => {
   // 词表里「符籙 related_to 正一」与「正一 related_to 符籙」两条边都存在，
   // 若按方向分组，用户会看到两个「相关概念」分组、正一出现两次

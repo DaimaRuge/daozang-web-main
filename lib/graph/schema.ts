@@ -17,7 +17,8 @@
 /**
  * 节点类型。
  * work/category/subcategory/person/tag 由现有 index.json 物化而来；
- * concept/deity/sect/ritual/place 由人工策展词表引入；
+ * concept/deity/sect/ritual/place 由人工策展词表或自动抽取引入，
+ * 节点 origin 字段区分二者；
  * image 为已通过来源审核的图像资产（AI 生成图不入公共图谱）。
  */
 export type GraphNodeType =
@@ -63,6 +64,17 @@ export type GraphEdgeSource =
   | 'human'      // 人工审核确认
   | 'llm';       // LLM 抽取（须进待审队列，当前未启用）
 
+/**
+ * 节点从哪来。UI 据此决定是否展示「词表释义」还是「自动抽取」标记。
+ *
+ * 词表有两个来源，不是靠人手覆盖全库：
+ * - curated：人工策展（gazetteer.json），可带 shortDef；
+ * - auto：语料统计抽出（terms.auto.json），只有频次/典籍数等证据，不编造释义；
+ * - query：检索词未命中实体时的合成中心点（relatedByKeyword）；
+ * - catalog：目录轴（典籍/部类/题署人物/标签）。
+ */
+export type GraphNodeOrigin = 'catalog' | 'curated' | 'auto' | 'query';
+
 /** 原文出处：与 lib/agent/context.ts 的 Citation 同构，便于 Agent 直接引用 */
 export interface GraphCitation {
   bookId: string;
@@ -85,9 +97,11 @@ export interface GraphNode {
   aliases?: string[];
   /**
    * 一句话释义。属第三层策展内容，UI 必须标注「词表释义」，
-   * 不得让用户误以为是典籍原文。
+   * 不得让用户误以为是典籍原文。自动抽取节点不得填写此字段。
    */
   shortDef?: string;
+  /** 节点来源。缺省视为 catalog，以兼容旧产物 */
+  origin?: GraphNodeOrigin;
   /** 该实体在全库被提及的典籍总数（用于节点权重/字号） */
   works?: number;
   /** work 节点专属：便于 UI 直接展示而无需再查 index */
@@ -125,6 +139,8 @@ export interface KnowledgeGraph {
     edges: number;
     works: number;
     entities: number;
+    /** 自动抽取并入图谱的术语数（不含与策展词重复的） */
+    autoEntities?: number;
     scannedChars: number;
     buildMs: number;
   };
@@ -148,6 +164,29 @@ export interface GazetteerEntry {
     to: string;
     type: Extract<GraphEdgeType, 'subclass_of' | 'related_to' | 'part_of'>;
   }>;
+}
+
+/**
+ * 自动抽取词表（data/graph/terms.auto.json）的一条。
+ * 只有统计证据，没有释义 —— 构建图谱时不得把 score 文案化成 shortDef。
+ */
+export interface AutoTermEntry {
+  term: string;
+  type: Exclude<GraphNodeType, 'work' | 'category' | 'subcategory' | 'tag' | 'image'>;
+  score: number;
+  typeConfidence: number;
+  typeBasis: string;
+  freq: number;
+  docFreq: number;
+  cohesion: number;
+  freedom: number;
+  titleDocFreq: number;
+}
+
+export interface AutoTermsFile {
+  version: number;
+  buildTime: string;
+  terms: AutoTermEntry[];
 }
 
 // ---------- 查询视图模型 ----------
@@ -209,6 +248,14 @@ export const EDGE_LABELS: Record<GraphEdgeType, string> = {
   similar_work: '关联文献',
   depicts: '图像所绘',
   illustrates: '配图',
+};
+
+/** 节点来源 → 面向用户的短标记 */
+export const NODE_ORIGIN_LABELS: Record<GraphNodeOrigin, string> = {
+  catalog: '道藏目录',
+  curated: '词表策展',
+  auto: '自动抽取',
+  query: '检索回退',
 };
 
 /** 节点类型 → 中文名（图例与侧栏共用） */

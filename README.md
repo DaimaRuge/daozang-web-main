@@ -54,15 +54,20 @@ git clone https://github.com/DaimaRuge/daozang-text.git data/daozang-text
 # 构建数据索引
 npm run build-index
 
-# 构建知识图谱（读 public/data，约 2 秒；产物 public/data/graph.json）
+# 构建知识图谱（读 public/data，约数秒；产物 public/data/graph.json）
 npm run build-graph
+
+# 从语料自动抽取术语（约 1 分钟；产物 data/graph/terms.auto.json，随后需再跑 build-graph）
+npm run extract-terms
 
 # 启动开发服务器
 npm run dev
 ```
 
-> 图谱产物随仓库提交，日常开发无需重建；仅在改动 `data/graph/gazetteer.json`
-> 或 `scripts/build-graph.ts` 后需要重新运行 `npm run build-graph`。
+> 图谱产物随仓库提交，日常开发无需重建；仅在改动 `data/graph/gazetteer.json`、
+> `data/graph/terms.auto.json` 或 `scripts/build-graph.ts` 后需要重新运行 `npm run build-graph`。
+> 词表有两个来源：人工策展，以及 `npm run extract-terms` 从语料统计抽出的术语
+> （自动节点不带释义，界面标注「自动抽取」）。
 
 ## 测试
 
