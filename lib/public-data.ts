@@ -17,7 +17,8 @@ import path from 'path';
 /** 分段拼接，降低 NFT 把整目录打进函数包的概率；真正的保证是 next.config 的 excludes */
 function publicFile(...segments: string[]): string {
   const prefix = ['public', ...segments];
-  return path.resolve(process.cwd(), prefix.join(path.sep));
+  // turbopackIgnore：动态拼接不得让 NFT 把整个仓库打进函数包
+  return path.resolve(/* turbopackIgnore: true */ process.cwd(), prefix.join(path.sep));
 }
 
 function publicOrigin(): string | null {
