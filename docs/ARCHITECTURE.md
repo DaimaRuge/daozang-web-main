@@ -26,7 +26,7 @@ components/
   reader/               阅读器组件族（编排/渲染/目录/设置/划词/笔记 各自独立）
 lib/
   content-schema.ts     内容数据模型（ContentBlock/ParsedBook/ImageAsset，接口契约单一来源）
-  graph/                知识图谱（第三层内容：schema 契约 / 多模式匹配 / 只读查询 / 径向布局）
+  graph/                知识图谱（第三层内容：schema 契约 / 多模式匹配 / 只读查询 / 径向布局 / 边校正）
   text-parser.ts        规则解析器 rule-v3（纯函数，可独立测试）
   parser-overrides.ts   人工校正层（/review 产出的 overrides 叠加到解析结果）
   zh-convert.ts         简繁转换（opencc-js），检索层查询变体扩展
@@ -38,6 +38,7 @@ lib/
   agent/                Agent 架构（context 契约 / provider 解耦 / tools 注册表 / chat 运行时）
 data/daozang-text/      原始 txt（不可变底稿）
 data/parser-overrides.json  人工校正数据（/review 产出，随代码提交）
+data/graph/overrides.json   图谱边校正（/review/graph 产出，随代码提交）
 public/data/            index.json + content/*.json（构建产物）
 tests/                  单元测试（解析器/检索/人工校正层）
 ```
@@ -69,6 +70,7 @@ flowchart LR
   query --> page["/graph 页"]
   query --> reader["阅读页「本书关联」"]
   query --> agent["Agent find_related_concepts"]
+  ov["data/graph/overrides.json 人工审边"] --> query
 ```
 
 | 关注点 | 决策与理由 |
@@ -77,7 +79,7 @@ flowchart LR
 | 产物形态 | 单一 `public/data/graph.json.gz`（gzip 后约 3MB；明文会超过 Vercel 函数包单文件上限），模块级缓存。不用「每节点一文件」：`public/data` 已有 1500+ 文件，再加数千碎文件只拖慢 git 与部署 |
 | 提及扫描 | Aho-Corasick（`lib/graph/matcher.ts`）。上千别名 × 3500 万字若逐词 `indexOf` 是数百亿次比较；自动机压成一遍扫描，最长匹配优先以免通用词淹没具体术语 |
 | 出处溯源 | 提及边存 `blockId`，借阅读器既有的 `#blockId` 深链（分页大部头会先翻页再闪烁）落到出现该词的那一段 |
-| 关系强弱 | 每条边带 `source` 与 `confidence`；共现按 Jaccard 排序而非原始次数（否则邻居全是「無為」「長生」等泛词）；低于 `LOW_CONFIDENCE` 的边 UI 标「待考」 |
+| 关系强弱 | 每条边带 `source` 与 `confidence`；共现按 Jaccard 排序而非原始次数（否则邻居全是「無為」「長生」等泛词）；低于 `LOW_CONFIDENCE` 的边 UI 标「待考」。人工在 `/review/graph` 确认或否决，校正写入 `data/graph/overrides.json`，查询层运行时叠加（确认 → `human` / 置信度 1；否决 → 运行时删除该边）。不改原文、不重写 `graph.json.gz` |
 | 找关联文献 | 典籍间 `similar_work` 边由共享概念的 IDF 加权余弦算出，通用概念按文档频率剔除 |
 | 词表双来源 | ① 人工策展 `gazetteer.json`（带释义）；② 语料统计自动抽取 `terms.auto.json`（`npm run extract-terms`，无释义）。查询未命中实体时还有第三条路径：关键词 → 命中典籍 → 其概念边 |
 | 自动抽取 | n-gram + 凝固度/左右熵/部类偏离 + 逻辑回归（策展词为正例，L2 防饱和）。自动节点标「自动抽取」，只用频次与原文出处作证据，不编造 shortDef |
@@ -164,8 +166,8 @@ DZ_LLM_MODEL=deepseek-chat
 
 辅助脚本：`npx tsx scripts/parse-report.ts` 生成全库解析质量报告（`docs/parse-report.md`），解析器规则改动前后对比该报告评估回归。
 
-人工审核流程（开发环境）：`npm run dev` 后访问 `/review`，按解析报告选书逐块确认/改判，
-校正写入 `data/parser-overrides.json`，随代码提交后线上自动生效（线上无写入口；
+人工审核流程（开发环境）：`npm run dev` 后访问 `/review`（解析结构）或 `/review/graph`（图谱待考边），
+校正分别写入 `data/parser-overrides.json` 与 `data/graph/overrides.json`，随代码提交后线上自动生效（线上无写入口；
 私有部署如需开放审核页，设置 `DZ_ENABLE_REVIEW=1`）。
 
 ## 四、后续路线图
@@ -211,10 +213,10 @@ DZ_LLM_MODEL=deepseek-chat
 - 概念检索升级：候选词提取从停用词规则升级为道教概念词表/分词器
 
 **知识图谱（第一期已落地，见上「知识图谱模块」）**
-- 已完成：schema 契约、94 条策展词表（以符箓语义域为核心）、全库块级提及扫描、
+- 已完成：schema 契约、94 条策展词表 + 800 条自动术语、全库块级提及扫描、
   概念共现与文献相关度、四个入口（搜索页 / `/graph` / 阅读页 / Agent 工具）
-- 第二期：词表扩至 1000+；仿 `/review` 做低置信度边的人工审核（只写图谱 overrides，不碰原文）；
-  作者字段清洗（`index.json` 的 `宋-宋-王慶升` 类题署噪声）
+- 第二期进行中：`/review/graph` 低置信度边人工审核（只写 `data/graph/overrides.json`，不碰原文）；
+  词表扩至 1000+、作者字段清洗（`index.json` 的 `宋-宋-王慶升` 类题署噪声）仍待做
 - 第三期：可选 LLM 关系抽取（产出必须进待审队列）；馆藏图像资产入图；
   向量检索作为实体解析失败时的辅助召回，而非替代本体边
 

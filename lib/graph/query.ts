@@ -11,7 +11,8 @@
  * 明文不进仓库，避免超过 Vercel 函数包单文件上限。
  *
  * 内容边界：本模块不生成任何解释性文字，只搬运构建期产物中已带
- * source / confidence / citations 的边，让 UI 能如实告知「凭什么这么连」。
+ * source / confidence / citations 的边，并叠加 data/graph/overrides.json
+ * 的人工确认/否决，让 UI 能如实告知「凭什么这么连」。
  */
 
 import {
@@ -25,6 +26,7 @@ import {
   RelationGroup,
 } from './schema';
 import { graphArtifactExists, loadKnowledgeGraph } from './load';
+import { applyGraphOverrides, loadGraphOverrides } from './overrides';
 import { queryVariants } from '../zh-convert';
 import { getEntryById, searchEntries } from '../data';
 
@@ -41,18 +43,22 @@ interface GraphRuntime {
 let _runtime: GraphRuntime | null | undefined;
 
 /**
- * 加载图谱产物。产物缺失时返回 null 而不是抛错 ——
+ * 加载图谱产物并叠加人工校正。产物缺失时返回 null 而不是抛错 ——
  * 图谱是增强能力，未构建时站点其余功能必须照常可用。
+ *
+ * 校正走 stand-off：不改 graph.json.gz，审核保存后调用 resetGraphRuntime
+ * 即可让下一跳查询看到确认/否决结果。
  */
 function getRuntime(): GraphRuntime | null {
   if (_runtime !== undefined) return _runtime;
 
-  const graph = loadKnowledgeGraph();
-  if (!graph) {
+  const raw = loadKnowledgeGraph();
+  if (!raw) {
     console.warn('[graph] 图谱产物不存在，请先运行 npm run build-graph');
     _runtime = null;
     return null;
   }
+  const graph = applyGraphOverrides(raw, loadGraphOverrides());
   const nodeById = new Map(graph.nodes.map(n => [n.id, n]));
   const adjacency = new Map<string, GraphEdge[]>();
   for (const edge of graph.edges) {
@@ -65,6 +71,11 @@ function getRuntime(): GraphRuntime | null {
 
   _runtime = { graph, nodeById, adjacency };
   return _runtime;
+}
+
+/** 审核写入 overrides 后必须失效，否则本进程仍读旧邻接表 */
+export function resetGraphRuntime(): void {
+  _runtime = undefined;
 }
 
 /** 图谱是否可用（UI 据此决定是否渲染入口，而不是渲染一个空面板） */
