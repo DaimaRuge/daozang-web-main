@@ -27,6 +27,7 @@ import {
 } from './schema';
 import { graphArtifactExists, loadKnowledgeGraph } from './load';
 import { applyGraphOverrides, loadGraphOverrides } from './overrides';
+import { formatAuthor } from '../author';
 import { queryVariants } from '../zh-convert';
 import { getEntryById, searchEntries } from '../data';
 
@@ -59,6 +60,17 @@ function getRuntime(): GraphRuntime | null {
     return null;
   }
   const graph = applyGraphOverrides(raw, loadGraphOverrides());
+  // 图谱产物里 work.meta.author 仍是构建当时的文件名题署；读入时再洗一次，
+  // 与 lib/data.ts 的展示口径一致，且不必为改展示去重写 3MB gzip。
+  for (const node of graph.nodes) {
+    const rawAuthor = node.meta?.author;
+    if (!rawAuthor) continue;
+    const author = formatAuthor(rawAuthor);
+    if (author === rawAuthor) continue;
+    node.meta = { ...node.meta };
+    if (author) node.meta.author = author;
+    else delete node.meta.author;
+  }
   const nodeById = new Map(graph.nodes.map(n => [n.id, n]));
   const adjacency = new Map<string, GraphEdge[]>();
   for (const edge of graph.edges) {

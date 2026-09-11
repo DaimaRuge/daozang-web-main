@@ -36,6 +36,7 @@ import {
 } from '../lib/graph/schema';
 import { getEntryTags } from '../lib/entry-tags';
 import type { DaozangEntry } from '../lib/data';
+import { formatAuthor, parseAuthor } from '../lib/author';
 
 const ROOT = path.resolve(__dirname, '..');
 const INDEX_PATH = path.join(ROOT, 'public/data/index.json');
@@ -105,21 +106,6 @@ interface MentionStat {
 
 function readJson<T>(p: string): T {
   return JSON.parse(fs.readFileSync(p, 'utf-8')) as T;
-}
-
-/**
- * 清洗 index.json 的 author 字段。
- * 文件名解析器产出的形态常见为「宋-宋-王慶升」（朝代重复），
- * 这里取末段为人名、首段为朝代；明显异常的丢弃而不是硬塞进图谱。
- */
-function parseAuthor(raw?: string): { name: string; era?: string } | null {
-  if (!raw) return null;
-  const parts = raw.split('-').map(s => s.trim()).filter(Boolean);
-  if (parts.length === 0) return null;
-  const name = parts[parts.length - 1];
-  if (!name || name.length > 8 || /[0-9A-Za-z]/.test(name)) return null;
-  const era = parts.length > 1 ? parts[0] : undefined;
-  return { name, era };
 }
 
 function main(): void {
@@ -202,7 +188,7 @@ function main(): void {
       meta: {
         category: e.category,
         subcategory: e.subcategory,
-        author: e.author,
+        author: formatAuthor(e.author),
         lineCount: e.lineCount,
       },
     });

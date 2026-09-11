@@ -30,6 +30,7 @@ lib/
   text-parser.ts        规则解析器 rule-v3（纯函数，可独立测试）
   parser-overrides.ts   人工校正层（/review 产出的 overrides 叠加到解析结果）
   zh-convert.ts         简繁转换（opencc-js），检索层查询变体扩展
+  author.ts             文件名题署清洗（宋-宋-王慶升 → 宋 · 王慶升）
   data.ts               索引与原文读取（服务端）
   fulltext-search.ts    全文检索（内存语料 + 简繁变体并集）
   user-data.ts          用户数据模型与本地存储（进度/收藏/笔记/设置/事件）
@@ -216,7 +217,8 @@ DZ_LLM_MODEL=deepseek-chat
 - 已完成：schema 契约、94 条策展词表 + 800 条自动术语、全库块级提及扫描、
   概念共现与文献相关度、四个入口（搜索页 / `/graph` / 阅读页 / Agent 工具）
 - 第二期进行中：`/review/graph` 低置信度边人工审核（只写 `data/graph/overrides.json`，不碰原文）；
-  词表扩至 1000+、作者字段清洗（`index.json` 的 `宋-宋-王慶升` 类题署噪声）仍待做
+  题署人物已在读入时清洗（`lib/author.ts`，去「宋-宋-王慶升」类文件名噪声）；
+  词表扩至 1000+ 仍待做
 - 第三期：可选 LLM 关系抽取（产出必须进待审队列）；馆藏图像资产入图；
   向量检索作为实体解析失败时的辅助召回，而非替代本体边
 

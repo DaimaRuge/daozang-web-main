@@ -2,6 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { queryVariants } from './zh-convert';
 import { readContent, readContentSync } from './public-data';
+import { formatAuthor } from './author';
 
 export interface DaozangEntry {
   id: string;
@@ -40,6 +41,16 @@ export function getIndex(): DaozangIndex {
       indexPath = path.resolve(process.cwd(), 'data/index.json');
     }
     _index = JSON.parse(fs.readFileSync(indexPath, 'utf-8'));
+    // 文件名题署在 index 里常是「宋-宋-王慶升」这类噪声；读入时统一清洗，
+    // 阅读页/检索/图谱入口不必各自正则，也不用为改展示去重写 index.json。
+    _index.entries = _index.entries.map(e => {
+      const author = formatAuthor(e.author);
+      if (author === e.author) return e;
+      const next = { ...e };
+      if (author) next.author = author;
+      else delete next.author;
+      return next;
+    });
   }
   return _index!;
 }
