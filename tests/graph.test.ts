@@ -339,6 +339,7 @@ test('查询：自动抽取节点若存在则不带编造释义', skipReason, ()
   }
   if (graph.stats.autoEntities) {
     assert.equal(autos.length, graph.stats.autoEntities);
+    assert.ok(autos.length >= 1000, `词表二期应并入至少 1000 条自动术语，实际 ${autos.length}`);
   }
 });
 

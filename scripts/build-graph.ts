@@ -37,6 +37,7 @@ import {
 import { getEntryTags } from '../lib/entry-tags';
 import type { DaozangEntry } from '../lib/data';
 import { formatAuthor, parseAuthor } from '../lib/author';
+import { MAX_AUTO_TERMS, pickAutoTerms } from '../lib/graph/auto-merge';
 
 const ROOT = path.resolve(__dirname, '..');
 const INDEX_PATH = path.join(ROOT, 'public/data/index.json');
@@ -53,8 +54,6 @@ const OUT_PATH_PLAIN = path.join(ROOT, 'public/data/graph.json');
 const MAX_MENTIONS_PER_ENTITY = 60;
 /** 自动抽取实体的提及边更狠地截断：它们数量大，样本够用即可 */
 const MAX_MENTIONS_PER_AUTO_ENTITY = 20;
-/** 并入图谱的自动术语上限：控制产物体积与画面噪声 */
-const MAX_AUTO_TERMS = 800;
 /** 每条提及边保留的出处样本数 */
 const MAX_CITATIONS_PER_EDGE = 2;
 /** 出处引文截断长度：只为定位与预览，不做原文再分发 */
@@ -245,29 +244,8 @@ function main(): void {
   if (fs.existsSync(AUTO_TERMS_PATH)) {
     const autoFile = readJson<AutoTermsFile>(AUTO_TERMS_PATH);
     const unused = autoFile.terms.filter(t => !aliasIndex[t.term]);
-    const byType = new Map<string, typeof unused>();
-    for (const t of unused) {
-      const list = byType.get(t.type) ?? [];
-      list.push(t);
-      byType.set(t.type, list);
-    }
-    for (const list of byType.values()) {
-      list.sort((a, b) => b.score - a.score || b.docFreq - a.docFreq);
-    }
-    // 山川构词会捞出大量「某山」，按类型封顶，以免占尽自动名额
-    const typeCap: Record<string, number> = {
-      place: 50,
-      person: 80,
-      deity: 120,
-      ritual: 40,
-      sect: 30,
-    };
-    const picked: typeof unused = [];
-    for (const [type, cap] of Object.entries(typeCap)) {
-      picked.push(...(byType.get(type) ?? []).slice(0, cap));
-    }
-    const rest = Math.max(0, MAX_AUTO_TERMS - picked.length);
-    picked.push(...(byType.get('concept') ?? []).slice(0, rest));
+    // 名额与山川/叠词过滤见 pickAutoTerms：扩到 1000 时先收神名与洞天
+    const picked = pickAutoTerms(unused, MAX_AUTO_TERMS);
     for (const t of picked) {
       if (aliasIndex[t.term]) continue;
       const id = nodeId(t.type, `auto-${t.term}`);
