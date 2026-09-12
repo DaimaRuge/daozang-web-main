@@ -8,6 +8,7 @@
  */
 
 import { auth } from '@/auth';
+import { findUserById } from '@/lib/db';
 
 export type UserRole = 'reader' | 'contributor' | 'moderator' | 'editor' | 'admin';
 
@@ -44,5 +45,19 @@ export async function requireRole(required: UserRole): Promise<{ userId: string;
   if (!hasRole(role, required)) {
     throw new AuthzError(403, `需要 ${required} 及以上权限`);
   }
+  return { userId, role };
+}
+
+/** 发帖等写操作：登录且未被封禁/禁言 */
+export async function requireActiveUser(): Promise<{ userId: string; role: UserRole }> {
+  const session = await auth();
+  const userId = session?.user?.id;
+  if (!userId) throw new AuthzError(401, '未登录');
+
+  const user = await findUserById(userId);
+  if (!user || user.status === 'banned') throw new AuthzError(403, '账号已停用');
+  if (user.status === 'muted') throw new AuthzError(403, '账号已禁言');
+
+  const role = (user.role ?? 'reader') as UserRole;
   return { userId, role };
 }

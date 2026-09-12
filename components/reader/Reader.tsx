@@ -858,6 +858,7 @@ export default function Reader({
               onFootnoteNavigate={navigateToBlock}
               annotationCounts={annotationCounts}
               onAnnotationClick={setSheetBlockId}
+              bookId={entry.id}
             />
           </article>
 

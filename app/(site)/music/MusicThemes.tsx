@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import MusicPlayer from '@/app/music/MusicPlayer';
+import MusicPlayer from '@/app/(site)/music/MusicPlayer';
 import { MUSIC_THEMES, MusicTheme, THEME_INTRO, TRACKS_BY_THEME } from '@/lib/music-catalog';
 import { getMusicPlayerState } from '@/lib/user-data';
 

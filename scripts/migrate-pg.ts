@@ -97,6 +97,104 @@ const STATEMENTS: string[] = [
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS role TEXT NOT NULL DEFAULT 'reader'`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS status TEXT NOT NULL DEFAULT 'active'`,
   `ALTER TABLE users ADD COLUMN IF NOT EXISTS region TEXT NOT NULL DEFAULT 'global'`,
+
+  // 审核留痕只增不改，供申诉复核与合规审计。
+  `CREATE TABLE IF NOT EXISTS moderation_records (
+    id BIGSERIAL PRIMARY KEY,
+    target_type TEXT NOT NULL,
+    target_id TEXT NOT NULL,
+    region TEXT NOT NULL,
+    policy TEXT NOT NULL,
+    ai_model TEXT,
+    ai_verdict TEXT,
+    ai_score DOUBLE PRECISION,
+    ai_categories JSONB,
+    ai_latency_ms INTEGER,
+    human_verdict TEXT,
+    moderator_user_id TEXT REFERENCES users(id),
+    reason TEXT,
+    created_at BIGINT NOT NULL,
+    decided_at BIGINT
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_mod_pending
+     ON moderation_records(target_type, human_verdict, region)`,
+
+  // 用户投稿：媒体走对象存储 key，不在此建 media_assets（留给 Payload）。
+  // 来源说明必填，是版权与合规的最低证据。
+  `CREATE TABLE IF NOT EXISTS contributions (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind TEXT NOT NULL,
+    title TEXT NOT NULL,
+    body TEXT,
+    source_note TEXT NOT NULL,
+    claimed_license TEXT NOT NULL,
+    storage_key TEXT,
+    content_type TEXT,
+    region TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_contrib_status ON contributions(status, region)`,
+
+  // 缺图候选：扫描写入 JSON，import:illustrations 导入此表。
+  `CREATE TABLE IF NOT EXISTS illustration_candidates (
+    id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL,
+    title TEXT,
+    collection TEXT,
+    category TEXT,
+    slot_label TEXT,
+    reader_href TEXT,
+    anchor_key TEXT NOT NULL,
+    block_id TEXT,
+    signal TEXT NOT NULL,
+    confidence REAL NOT NULL,
+    excerpt TEXT,
+    kind TEXT,
+    clue TEXT,
+    volume_title TEXT,
+    volume_block_id TEXT,
+    source_start INTEGER,
+    source_end INTEGER,
+    state TEXT NOT NULL DEFAULT 'open',
+    resolved_anchor_id TEXT,
+    created_at BIGINT NOT NULL,
+    UNIQUE (book_id, anchor_key, signal)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_illust_cand_book
+     ON illustration_candidates(book_id, state)`,
+  `ALTER TABLE illustration_candidates ADD COLUMN IF NOT EXISTS title TEXT`,
+  `ALTER TABLE illustration_candidates ADD COLUMN IF NOT EXISTS collection TEXT`,
+  `ALTER TABLE illustration_candidates ADD COLUMN IF NOT EXISTS category TEXT`,
+  `ALTER TABLE illustration_candidates ADD COLUMN IF NOT EXISTS slot_label TEXT`,
+  `ALTER TABLE illustration_candidates ADD COLUMN IF NOT EXISTS reader_href TEXT`,
+
+  // 读者对原书插图复原（朱砂/墨线）的人工校定。
+  `CREATE TABLE IF NOT EXISTS restore_calibrations (
+    id TEXT PRIMARY KEY,
+    book_id TEXT NOT NULL,
+    part TEXT NOT NULL,
+    file TEXT NOT NULL,
+    variant TEXT NOT NULL DEFAULT 'cinnabar',
+    verdict TEXT NOT NULL,
+    note TEXT NOT NULL DEFAULT '',
+    author_user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    author_name TEXT,
+    ai_action TEXT,
+    ai_summary TEXT,
+    created_at BIGINT NOT NULL,
+    updated_at BIGINT NOT NULL,
+    UNIQUE (author_user_id, book_id, file)
+  )`,
+  `CREATE INDEX IF NOT EXISTS idx_restore_cal_book
+     ON restore_calibrations(book_id, file, created_at DESC)`,
+  `CREATE INDEX IF NOT EXISTS idx_restore_cal_verdict
+     ON restore_calibrations(verdict, updated_at DESC)`,
+
+  // Payload CMS 表隔离在独立 schema，避免 Drizzle 碰到前台 users。
+  `CREATE SCHEMA IF NOT EXISTS payload`,
 ];
 
 export async function migrate(): Promise<void> {

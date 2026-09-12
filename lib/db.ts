@@ -7,6 +7,7 @@
  */
 
 import { query, queryOne, execute } from '@/lib/pg';
+import { currentRegion, initialUgcStatus } from '@/lib/moderation/policy';
 
 export interface DbUser {
   id: string;
@@ -239,13 +240,14 @@ export async function createAnnotation(input: {
   body: string;
   authorUserId: string;
   authorName?: string | null;
+  status?: string;
 }): Promise<DbAnnotation> {
   const now = Date.now();
   const row = await queryOne<DbAnnotation>(
     `INSERT INTO annotations
        (id, book_id, block_id, quote, char_start, char_end, body,
         author_user_id, author_name, status, report_count, created_at, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'approved', 0, $10, $11)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, 0, $11, $12)
      RETURNING *`,
     [
       newId('an'),
@@ -257,6 +259,7 @@ export async function createAnnotation(input: {
       input.body,
       input.authorUserId,
       input.authorName ?? null,
+      input.status ?? initialUgcStatus('text-ugc'),
       now,
       now,
     ],
@@ -301,11 +304,12 @@ export async function createComment(input: {
   authorUserId: string;
   authorName?: string | null;
   parentId?: string | null;
+  status?: string;
 }): Promise<DbComment> {
   const row = await queryOne<DbComment>(
     `INSERT INTO comments
        (id, book_id, parent_id, body, author_user_id, author_name, status, report_count, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, 'approved', 0, $7)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, 0, $8)
      RETURNING *`,
     [
       newId('cm'),
@@ -314,6 +318,7 @@ export async function createComment(input: {
       input.body,
       input.authorUserId,
       input.authorName ?? null,
+      input.status ?? initialUgcStatus('text-ugc'),
       Date.now(),
     ],
   );
@@ -335,16 +340,29 @@ export async function deleteComment(id: string, authorUserId: string): Promise<b
   return changed > 0;
 }
 
-/** 计每用户当日发布数：限流用 */
+/** 计每用户当日发布数（旁注+评论+投稿合计）：限流用 */
 export async function countUserContributionsToday(authorUserId: string): Promise<number> {
   const since = Date.now() - 86400000;
-  const row = await queryOne<{ c: number }>(
-    `SELECT
-       (SELECT COUNT(*) FROM annotations WHERE author_user_id = $1 AND created_at > $2)
-     + (SELECT COUNT(*) FROM comments    WHERE author_user_id = $1 AND created_at > $2) AS c`,
-    [authorUserId, since],
-  );
-  return row?.c ?? 0;
+  try {
+    const row = await queryOne<{ c: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM annotations WHERE author_user_id = $1 AND created_at > $2)
+       + (SELECT COUNT(*) FROM comments    WHERE author_user_id = $1 AND created_at > $2)
+       + (SELECT COUNT(*) FROM contributions WHERE user_id = $1 AND created_at > $2)
+       + (SELECT COUNT(*) FROM restore_calibrations WHERE author_user_id = $1 AND created_at > $2) AS c`,
+      [authorUserId, since],
+    );
+    return Number(row?.c ?? 0);
+  } catch {
+    const row = await queryOne<{ c: number }>(
+      `SELECT
+         (SELECT COUNT(*) FROM annotations WHERE author_user_id = $1 AND created_at > $2)
+       + (SELECT COUNT(*) FROM comments    WHERE author_user_id = $1 AND created_at > $2)
+       + (SELECT COUNT(*) FROM contributions WHERE user_id = $1 AND created_at > $2) AS c`,
+      [authorUserId, since],
+    );
+    return Number(row?.c ?? 0);
+  }
 }
 
 // ---------- 举报 ----------
@@ -354,15 +372,362 @@ export async function reportContent(
   kind: 'annotation' | 'comment',
   id: string,
   hideThreshold = 3,
-): Promise<boolean> {
-  // 表名不能参数化，用白名单映射避免拼接注入。
+): Promise<{ found: boolean; hidden: boolean }> {
   const table = kind === 'annotation' ? 'annotations' : 'comments';
-  const changed = await execute(
+  const row = await queryOne<{ status: string; report_count: number }>(
     `UPDATE ${table}
         SET report_count = report_count + 1,
             status = CASE WHEN report_count + 1 >= $1 THEN 'hidden' ELSE status END
-      WHERE id = $2`,
+      WHERE id = $2
+      RETURNING status, report_count`,
     [hideThreshold, id],
   );
-  return changed > 0;
+  if (!row) return { found: false, hidden: false };
+  const hidden = row.status === 'hidden';
+  // 只在刚跨过阈值时写一条记录，避免后续重复举报把队列刷爆。
+  if (row.report_count === hideThreshold) {
+    await insertModerationRecord({
+      targetType: kind,
+      targetId: id,
+      policy: 'human-queue',
+      reason: `report_count=${row.report_count}`,
+    });
+  }
+  return { found: true, hidden };
+}
+
+export type UgcKind = 'annotation' | 'comment' | 'contribution';
+
+export interface ModerationQueueItem {
+  kind: UgcKind;
+  id: string;
+  book_id: string;
+  body: string;
+  quote: string | null;
+  author_user_id: string;
+  author_name: string | null;
+  status: string;
+  report_count: number;
+  created_at: number;
+}
+
+export async function listModerationQueue(opts: {
+  kind?: UgcKind | 'all';
+  status?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<ModerationQueueItem[]> {
+  const limit = Math.min(opts.limit ?? 50, 100);
+  const offset = opts.offset ?? 0;
+  const status = opts.status && opts.status !== 'all' ? opts.status : null;
+  const kind = opts.kind && opts.kind !== 'all' ? opts.kind : null;
+
+  const statusFilter = status
+    ? 'status = $1'
+    : `status IN ('hidden', 'pending')`;
+  const params: unknown[] = status ? [status] : [];
+  const limPh = `$${params.length + 1}`;
+  const offPh = `$${params.length + 2}`;
+  params.push(limit, offset);
+
+  const contribStatusFilter = status
+    ? 'c.status = $1'
+    : `c.status IN ('hidden', 'pending')`;
+
+  const annotationSql = `
+    SELECT 'annotation'::text AS kind, id, book_id, body, quote,
+           author_user_id, author_name, status, report_count, created_at
+      FROM annotations WHERE ${statusFilter}`;
+  const commentSql = `
+    SELECT 'comment'::text AS kind, id, book_id, body, NULL::text AS quote,
+           author_user_id, author_name, status, report_count, created_at
+      FROM comments WHERE ${statusFilter}`;
+  const contributionSql = `
+    SELECT 'contribution'::text AS kind, c.id, COALESCE(c.kind, '') AS book_id,
+           (c.title || E'\\n来源：' || c.source_note
+             || COALESCE(E'\\n' || NULLIF(c.body, ''), '')) AS body,
+           c.storage_key AS quote,
+           c.user_id AS author_user_id, u.name AS author_name,
+           c.status, 0 AS report_count, c.created_at
+      FROM contributions c
+      LEFT JOIN users u ON u.id = c.user_id
+     WHERE ${contribStatusFilter}`;
+
+  let union = `${annotationSql} UNION ALL ${commentSql} UNION ALL ${contributionSql}`;
+  if (kind === 'annotation') union = annotationSql;
+  if (kind === 'comment') union = commentSql;
+  if (kind === 'contribution') union = contributionSql;
+
+  return query<ModerationQueueItem>(
+    `${union} ORDER BY created_at DESC LIMIT ${limPh} OFFSET ${offPh}`,
+    params,
+  );
+}
+
+export async function countModerationQueue(): Promise<{ hidden: number; pending: number }> {
+  const row = await queryOne<{ hidden: number; pending: number }>(
+    `SELECT
+       (SELECT COUNT(*) FROM annotations WHERE status = 'hidden')
+     + (SELECT COUNT(*) FROM comments WHERE status = 'hidden')
+     + (SELECT COUNT(*) FROM contributions WHERE status = 'hidden') AS hidden,
+       (SELECT COUNT(*) FROM annotations WHERE status = 'pending')
+     + (SELECT COUNT(*) FROM comments WHERE status = 'pending')
+     + (SELECT COUNT(*) FROM contributions WHERE status = 'pending') AS pending`,
+  );
+  return { hidden: Number(row?.hidden ?? 0), pending: Number(row?.pending ?? 0) };
+}
+
+export async function setUgcStatus(kind: UgcKind, id: string, status: string): Promise<boolean> {
+  const now = Date.now();
+  if (kind === 'annotation') {
+    const n = await execute(
+      `UPDATE annotations SET status = $1, updated_at = $2 WHERE id = $3`,
+      [status, now, id],
+    );
+    return n > 0;
+  }
+  if (kind === 'contribution') {
+    const n = await execute(
+      `UPDATE contributions SET status = $1, updated_at = $2 WHERE id = $3`,
+      [status, now, id],
+    );
+    return n > 0;
+  }
+  const n = await execute(`UPDATE comments SET status = $1 WHERE id = $2`, [status, id]);
+  return n > 0;
+}
+
+export interface ModerationRecordInput {
+  targetType: string;
+  targetId: string;
+  policy: string;
+  humanVerdict?: string | null;
+  moderatorUserId?: string | null;
+  reason?: string | null;
+  aiModel?: string | null;
+  aiVerdict?: string | null;
+  aiScore?: number | null;
+  aiCategories?: string[] | null;
+  aiLatencyMs?: number | null;
+}
+
+export async function insertModerationRecord(input: ModerationRecordInput): Promise<void> {
+  await execute(
+    `INSERT INTO moderation_records
+       (target_type, target_id, region, policy,
+        ai_model, ai_verdict, ai_score, ai_categories, ai_latency_ms,
+        human_verdict, moderator_user_id, reason, created_at, decided_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)`,
+    [
+      input.targetType,
+      input.targetId,
+      currentRegion(),
+      input.policy,
+      input.aiModel ?? null,
+      input.aiVerdict ?? null,
+      input.aiScore ?? null,
+      input.aiCategories ?? null,
+      input.aiLatencyMs ?? null,
+      input.humanVerdict ?? null,
+      input.moderatorUserId ?? null,
+      input.reason ?? null,
+      Date.now(),
+      input.humanVerdict ? Date.now() : null,
+    ],
+  );
+}
+
+export type ContributionKind = 'image' | 'audio' | 'book';
+export type ClaimedLicense = 'public-domain' | 'own-work' | 'licensed' | 'unknown';
+
+export interface DbContribution {
+  id: string;
+  user_id: string;
+  kind: ContributionKind;
+  title: string;
+  body: string | null;
+  source_note: string;
+  claimed_license: string;
+  storage_key: string | null;
+  content_type: string | null;
+  region: string;
+  status: string;
+  created_at: number;
+  updated_at: number;
+  author_name?: string | null;
+}
+
+export async function createContribution(input: {
+  userId: string;
+  kind: ContributionKind;
+  title: string;
+  body?: string | null;
+  sourceNote: string;
+  claimedLicense: ClaimedLicense;
+  storageKey?: string | null;
+  contentType?: string | null;
+  status: string;
+}): Promise<DbContribution> {
+  const now = Date.now();
+  const row = await queryOne<DbContribution>(
+    `INSERT INTO contributions
+       (id, user_id, kind, title, body, source_note, claimed_license,
+        storage_key, content_type, region, status, created_at, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+     RETURNING *`,
+    [
+      newId('ct'),
+      input.userId,
+      input.kind,
+      input.title,
+      input.body ?? null,
+      input.sourceNote,
+      input.claimedLicense,
+      input.storageKey ?? null,
+      input.contentType ?? null,
+      currentRegion(),
+      input.status,
+      now,
+      now,
+    ],
+  );
+  return row!;
+}
+
+export async function listApprovedContributions(limit = 30): Promise<DbContribution[]> {
+  return query<DbContribution>(
+    `SELECT c.*, u.name AS author_name
+       FROM contributions c
+       LEFT JOIN users u ON u.id = c.user_id
+      WHERE c.status = 'approved'
+      ORDER BY c.created_at DESC
+      LIMIT $1`,
+    [Math.min(limit, 100)],
+  );
+}
+
+// ---------- 插图复原校定 ----------
+
+export interface DbRestoreCalibration {
+  id: string;
+  book_id: string;
+  part: string;
+  file: string;
+  variant: string;
+  verdict: string;
+  note: string;
+  author_user_id: string;
+  author_name: string | null;
+  ai_action: string | null;
+  ai_summary: string | null;
+  created_at: number;
+  updated_at: number;
+}
+
+export interface RestoreCalibrationInput {
+  bookId: string;
+  part: string;
+  file: string;
+  variant: string;
+  verdict: string;
+  note: string;
+  authorUserId: string;
+  authorName?: string | null;
+  aiAction?: string | null;
+  aiSummary?: string | null;
+}
+
+export async function upsertRestoreCalibration(
+  input: RestoreCalibrationInput,
+): Promise<DbRestoreCalibration> {
+  const now = Date.now();
+  const row = await queryOne<DbRestoreCalibration>(
+    `INSERT INTO restore_calibrations (
+       id, book_id, part, file, variant, verdict, note,
+       author_user_id, author_name, ai_action, ai_summary, created_at, updated_at
+     ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$12)
+     ON CONFLICT (author_user_id, book_id, file) DO UPDATE SET
+       part = EXCLUDED.part,
+       variant = EXCLUDED.variant,
+       verdict = EXCLUDED.verdict,
+       note = EXCLUDED.note,
+       author_name = EXCLUDED.author_name,
+       ai_action = EXCLUDED.ai_action,
+       ai_summary = EXCLUDED.ai_summary,
+       updated_at = EXCLUDED.updated_at
+     RETURNING *`,
+    [
+      newId('rc'),
+      input.bookId,
+      input.part,
+      input.file,
+      input.variant,
+      input.verdict,
+      input.note,
+      input.authorUserId,
+      input.authorName ?? null,
+      input.aiAction ?? null,
+      input.aiSummary ?? null,
+      now,
+    ],
+  );
+  return row!;
+}
+
+export async function updateRestoreCalibrationAi(
+  id: string,
+  aiAction: string,
+  aiSummary: string,
+): Promise<boolean> {
+  const n = await execute(
+    `UPDATE restore_calibrations SET ai_action = $1, ai_summary = $2, updated_at = $3 WHERE id = $4`,
+    [aiAction, aiSummary, Date.now(), id],
+  );
+  return n > 0;
+}
+
+export async function getRestoreCalibrationByUser(
+  authorUserId: string,
+  bookId: string,
+  file: string,
+): Promise<DbRestoreCalibration | undefined> {
+  return queryOne<DbRestoreCalibration>(
+    `SELECT * FROM restore_calibrations
+      WHERE author_user_id = $1 AND book_id = $2 AND file = $3`,
+    [authorUserId, bookId, file],
+  );
+}
+
+export async function listRestoreCalibrations(opts?: {
+  bookId?: string;
+  verdict?: string;
+  limit?: number;
+}): Promise<DbRestoreCalibration[]> {
+  const limit = Math.min(opts?.limit ?? 50, 200);
+  const clauses: string[] = [];
+  const params: unknown[] = [];
+  if (opts?.bookId) {
+    params.push(opts.bookId);
+    clauses.push(`book_id = $${params.length}`);
+  }
+  if (opts?.verdict) {
+    params.push(opts.verdict);
+    clauses.push(`verdict = $${params.length}`);
+  }
+  const where = clauses.length ? `WHERE ${clauses.join(' AND ')}` : '';
+  params.push(limit);
+  return query<DbRestoreCalibration>(
+    `SELECT * FROM restore_calibrations
+      ${where}
+      ORDER BY CASE WHEN verdict = 'fail' THEN 0 ELSE 1 END, updated_at DESC
+      LIMIT $${params.length}`,
+    params,
+  );
+}
+
+export async function countRestoreCalibrationFails(): Promise<number> {
+  const row = await queryOne<{ c: number }>(
+    `SELECT COUNT(*) AS c FROM restore_calibrations WHERE verdict = 'fail'`,
+  );
+  return Number(row?.c ?? 0);
 }

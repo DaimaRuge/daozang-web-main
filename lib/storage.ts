@@ -13,6 +13,26 @@ import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export type MediaKind = 'audio' | 'image' | 'video';
 
+export const UPLOAD_CACHE_CONTROL = 'public, max-age=31536000, immutable';
+
+export function isStorageConfigured(): boolean {
+  return Boolean(
+    process.env.DZ_S3_ENDPOINT &&
+    process.env.DZ_S3_ACCESS_KEY_ID &&
+    process.env.DZ_S3_SECRET_ACCESS_KEY &&
+    process.env.DZ_S3_BUCKET &&
+    process.env.NEXT_PUBLIC_MEDIA_BASE_URL,
+  );
+}
+
+/** 校验浏览器回传的 key 确实是我们签发的分目录格式，防止任意覆盖桶内对象。 */
+export function isOwnedStorageKey(kind: MediaKind, key: string): boolean {
+  if (!key || key.includes('..') || key.includes('\\') || key.startsWith('/') || key.includes('//')) {
+    return false;
+  }
+  return new RegExp(`^${kind}/\\d{4}/\\d{2}/[^/]+$`).test(key);
+}
+
 /**
  * 构造对象 key。
  *
@@ -80,7 +100,7 @@ export async function uploadObject(
     Body: body,
     ContentType: contentType,
     // 媒体资产内容不可变（key 带随机后缀），可长期强缓存
-    CacheControl: 'public, max-age=31536000, immutable',
+    CacheControl: UPLOAD_CACHE_CONTROL,
   }));
   return publicUrl(key);
 }
@@ -105,7 +125,7 @@ export async function createUploadUrl(
     Bucket: getBucket(),
     Key: key,
     ContentType: contentType,
-    CacheControl: 'public, max-age=31536000, immutable',
+    CacheControl: UPLOAD_CACHE_CONTROL,
   });
   return getSignedUrl(getClient(), command, { expiresIn: expiresInSeconds });
 }

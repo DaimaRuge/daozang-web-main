@@ -25,9 +25,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'kind and id required' }, { status: 400 });
   }
 
-  const ok = await reportContent(kind, id);
-  if (!ok) {
+  const result = await reportContent(kind, id);
+  if (!result.found) {
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, hidden: result.hidden });
 }

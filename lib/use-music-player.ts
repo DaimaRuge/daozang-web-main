@@ -10,7 +10,7 @@ import {
   saveMusicPlayerState,
   trackEvent,
 } from '@/lib/user-data';
-import type { MusicTrack } from '@/app/music/MusicPlayer';
+import type { MusicTrack } from '@/app/(site)/music/MusicPlayer';
 
 export interface MusicRuntimeState extends MusicPlayerPersist {
   playing: boolean;

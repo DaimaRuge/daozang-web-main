@@ -11,7 +11,7 @@ import {
   MusicTheme,
   musicImg,
 } from '../lib/music-catalog';
-import type { MusicTrack } from '../app/music/MusicPlayer';
+import type { MusicTrack } from '../app/(site)/music/MusicPlayer';
 
 export const MUSIC_IMAGE_STYLE =
   'Traditional Chinese ink wash painting on aged xuan paper, Song literati aesthetic, serene Taoist atmosphere, elegant negative space, muted pine-green and vermilion accents, no text, no watermark, no modern elements';

@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import './globals.css';
+import '../globals.css';
 import Nav from '@/components/Nav';
 import MusicProvider from '@/components/music/MusicProvider';
 import AuthProvider from '@/components/auth/AuthProvider';
@@ -20,7 +20,7 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="zh-CN">
       <head>

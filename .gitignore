@@ -12,6 +12,10 @@ data/index.json
 data/content.json
 data/daozang.db
 data/daozang.db-*
+data/images-daozang/
+data/images-daozang-meta/
+data/daozang-images.json
+data/daozang-tiny-skips.json
 
 # misc
 .DS_Store
@@ -30,5 +34,11 @@ test_download.txt
 # 本地调试产物
 .playwright-mcp/
 tsconfig.tsbuildinfo
+.payload/
+.superpowers/
+public/restore-compare.html
+public/restore-compare/
 
-.vercel
+# Next 16 会尝试生成；本项目用 .cursor/rules，不要入库
+AGENTS.md
+CLAUDE.md

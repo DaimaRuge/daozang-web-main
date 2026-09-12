@@ -1,10 +1,8 @@
 import { Suspense } from 'react';
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getEntryById, getContentById, getAdjacentEntries } from '@/lib/data';
-import { parseText } from '@/lib/text-parser';
-import { applyOverrides } from '@/lib/parser-overrides';
-import { injectRitualIllustrations } from '@/lib/ritual-illustrations';
+import { getEntryById, getAdjacentEntries } from '@/lib/data';
+import { loadParsedBook } from '@/lib/book-content';
 import Reader from '@/components/reader/Reader';
 
 /**
@@ -40,11 +38,8 @@ export default async function TextPage({ params }: PageProps) {
   const entry = getEntryById(id);
   if (!entry) notFound();
 
-  const content = getContentById(id);
-  // 规则解析 → 人工校正 → 科仪示意图注入（均在服务端完成，正文 SSR 可读）
-  const parsed = injectRitualIllustrations(
-    applyOverrides(parseText(content, id, entry.title)),
-  );
+  const parsed = loadParsedBook(id);
+  if (!parsed) notFound();
   const { prev, next } = getAdjacentEntries(id);
 
   return (

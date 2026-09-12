@@ -8,7 +8,7 @@
 import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { buildStorageKey } from '../lib/storage';
+import { buildStorageKey, isOwnedStorageKey } from '../lib/storage';
 import { resolveMediaUrl } from '../lib/media-url';
 
 describe('buildStorageKey', () => {
@@ -28,6 +28,21 @@ describe('buildStorageKey', () => {
     assert.equal(key.includes('..'), false);
     assert.equal(key.includes(' '), false);
     assert.match(key, /\.png$/);
+  });
+});
+
+describe('isOwnedStorageKey', () => {
+  test('只接受本类型下按年月分目录的单文件 key', () => {
+    assert.equal(isOwnedStorageKey('image', 'image/2026/08/cover-abcd1234.jpg'), true);
+    assert.equal(isOwnedStorageKey('audio', 'audio/2026/08/chant-deadbeef.mp3'), true);
+  });
+
+  test('拒绝穿目录、错类型与多余路径段', () => {
+    assert.equal(isOwnedStorageKey('image', 'audio/2026/08/cover-abcd1234.jpg'), false);
+    assert.equal(isOwnedStorageKey('image', 'image/2026/08/a/b.jpg'), false);
+    assert.equal(isOwnedStorageKey('image', '../image/2026/08/x.jpg'), false);
+    assert.equal(isOwnedStorageKey('image', '/image/2026/08/x.jpg'), false);
+    assert.equal(isOwnedStorageKey('image', 'image/cover.jpg'), false);
   });
 });
 

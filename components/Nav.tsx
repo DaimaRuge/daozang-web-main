@@ -12,6 +12,7 @@ const navItems = [
   { href: '/search', label: '搜索' },
   { href: '/ask', label: '智能问道' },
   { href: '/music', label: '道乐' },
+  { href: '/contribute', label: '来稿' },
   { href: '/library', label: '我的书房' },
   { href: '/about', label: '关于' },
 ];
@@ -96,6 +97,9 @@ export default function Nav() {
             >
               背景道乐：{state.backgroundEnabled ? '开' : '关'}
             </button>
+            <div className="py-2" onClick={() => setOpen(false)}>
+              <AuthButton />
+            </div>
           </div>
         </div>
       )}

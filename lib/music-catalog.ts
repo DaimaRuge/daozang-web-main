@@ -1,4 +1,4 @@
-import { MusicTrack } from '@/app/music/MusicPlayer';
+import { MusicTrack } from '@/app/(site)/music/MusicPlayer';
 
 export type MusicTheme = 'wuxing' | 'bagua' | 'tiangan' | 'shichen' | 'jieqi';
 

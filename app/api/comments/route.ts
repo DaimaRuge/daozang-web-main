@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextResponse, after } from 'next/server';
 import { auth } from '@/auth';
 import {
   createComment,
@@ -7,6 +7,13 @@ import {
   countUserContributionsToday,
 } from '@/lib/db';
 import { UGC_LIMITS, sanitizeUgcText } from '@/lib/ugc';
+import { AuthzError, requireActiveUser } from '@/lib/auth-role';
+import { evaluateHardRules } from '@/lib/moderation/rules';
+import {
+  applyDeferredAiReview,
+  persistAiReview,
+  planTextUgcVisibility,
+} from '@/lib/moderation/pipeline';
 
 /**
  * 全文评论 API。
@@ -33,9 +40,14 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: 'login required' }, { status: 401 });
+  let userId: string;
+  try {
+    ({ userId } = await requireActiveUser());
+  } catch (err) {
+    if (err instanceof AuthzError) {
+      return NextResponse.json({ error: err.message }, { status: err.statusCode });
+    }
+    throw err;
   }
 
   let body: unknown;
@@ -53,17 +65,31 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'bookId and body required' }, { status: 400 });
   }
 
-  if ((await countUserContributionsToday(session.user.id)) >= UGC_LIMITS.dailyPerUser) {
+  const rules = evaluateHardRules(text);
+  if (rules.reject) {
+    return NextResponse.json({ error: '内容未通过审核' }, { status: 400 });
+  }
+
+  if ((await countUserContributionsToday(userId)) >= UGC_LIMITS.dailyPerUser) {
     return NextResponse.json({ error: '今日发布已达上限，明日再来' }, { status: 429 });
   }
 
+  const vis = await planTextUgcVisibility({ text });
+  const session = await auth();
   const created = await createComment({
     bookId,
     body: text,
-    authorUserId: session.user.id,
-    authorName: session.user.name ?? null,
+    authorUserId: userId,
+    authorName: session?.user?.name ?? null,
     parentId: typeof p.parentId === 'string' ? p.parentId : null,
+    status: vis.status,
   });
+  if (vis.review) {
+    await persistAiReview('comment', created.id, vis.policy, vis.review);
+  }
+  if (vis.defer) {
+    after(() => applyDeferredAiReview('comment', created.id, text));
+  }
 
   return NextResponse.json({
     ok: true,

@@ -12,7 +12,9 @@ export const UGC_LIMITS = {
   commentMaxLen: 2000,
   /** 锚定原文引用最大字符数（超出截断存储） */
   quoteMaxLen: 500,
-  /** 单用户每日发布上限（旁注 + 评论合计） */
+  /** 插图校定备注最大字符数 */
+  calibrationNoteMaxLen: 500,
+  /** 单用户每日发布上限（旁注 + 评论 + 投稿 + 校定合计） */
   dailyPerUser: 30,
 } as const;
 

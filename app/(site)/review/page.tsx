@@ -128,6 +128,9 @@ export default async function ReviewPage({ searchParams }: PageProps) {
       <p className="text-xs text-[var(--muted)] mt-10 leading-relaxed">
         提示：优先审核 docs/parse-report.md 中「低置信度占比最高」的典籍。
         校正结果写入 data/parser-overrides.json，请随代码一并提交。
+        <Link href="/demo/typography" className="ml-2 text-[var(--accent)] hover:underline">
+          缺图排版试验 →
+        </Link>
       </p>
     </div>
   );

@@ -1,8 +1,6 @@
 import { NextResponse } from 'next/server';
-import { getContentById, getEntryById } from '@/lib/data';
-import { parseText } from '@/lib/text-parser';
-import { applyOverrides } from '@/lib/parser-overrides';
-import { injectRitualIllustrations } from '@/lib/ritual-illustrations';
+import { getEntryById } from '@/lib/data';
+import { loadParsedBook } from '@/lib/book-content';
 import { paginateBlocks, findVolumeForBlockIndex } from '@/lib/book-pagination';
 
 interface RouteParams {
@@ -20,10 +18,8 @@ export async function GET(_req: Request, { params }: RouteParams) {
   const entry = getEntryById(id);
   if (!entry) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const content = getContentById(id);
-  const parsed = injectRitualIllustrations(
-    applyOverrides(parseText(content, id, entry.title)),
-  );
+  const parsed = loadParsedBook(id);
+  if (!parsed) return NextResponse.json({ error: 'not found' }, { status: 404 });
   const pages = paginateBlocks(parsed.blocks);
 
   if (pageIndex >= pages.length) {
