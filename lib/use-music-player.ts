@@ -2,6 +2,7 @@
 
 import { useSyncExternalStore } from 'react';
 import { MusicTheme, TRACKS_BY_THEME } from '@/lib/music-catalog';
+import { mediaUrl } from '@/lib/media-url';
 import {
   MusicPlayerPersist,
   DEFAULT_MUSIC_PLAYER,
@@ -9,15 +10,21 @@ import {
   saveMusicPlayerState,
   trackEvent,
 } from '@/lib/user-data';
-import type { MusicTrack } from '@/app/music/MusicPlayer';
+import type { MusicTrack } from '@/app/(site)/music/MusicPlayer';
 
 export interface MusicRuntimeState extends MusicPlayerPersist {
   playing: boolean;
   barVisible: boolean;
 }
 
+/**
+ * 初始态必须与 SERVER_MUSIC_SNAPSHOT 一致。
+ * 禁止在模块加载时读 localStorage：客户端预水合读到 trackId 会导致
+ * GlobalMusicBar 服务端 null、客户端有 DOM，触发 hydration mismatch。
+ * 持久化恢复只走 MusicProvider 里的 hydrateFromStorage（useEffect）。
+ */
 let runtime: MusicRuntimeState = {
-  ...getMusicPlayerState(),
+  ...DEFAULT_MUSIC_PLAYER,
   playing: false,
   barVisible: false,
 };
@@ -80,8 +87,9 @@ export const musicActions = {
       barVisible: runtime.backgroundEnabled,
     };
     if (audio) {
+      // endsWith(track.audio) 仍成立：CDN 前缀后 URL 仍以 /audio/xx.mp3 结尾
       if (!same || !audio.src.endsWith(track.audio)) {
-        audio.src = track.audio;
+        audio.src = mediaUrl(track.audio);
         audio.currentTime = same ? runtime.currentTime : 0;
       }
       audio.loop = runtime.loop;
@@ -152,7 +160,14 @@ export const musicActions = {
   },
 
   hydrateFromStorage() {
-    runtime = { ...runtime, ...getMusicPlayerState(), playing: false };
+    const stored = getMusicPlayerState();
+    runtime = {
+      ...runtime,
+      ...stored,
+      playing: false,
+      // 有曲目且开启背景道乐时才显示底栏（与用户上次会话对齐）
+      barVisible: stored.backgroundEnabled && !!stored.trackId,
+    };
     emit();
   },
 
@@ -160,7 +175,7 @@ export const musicActions = {
     if (!runtime.trackId) return;
     const track = getCurrentTrack();
     if (!track) return;
-    audio.src = track.audio;
+    audio.src = mediaUrl(track.audio);
     audio.loop = runtime.loop;
     audio.currentTime = runtime.currentTime;
     if (runtime.playing) audio.play().catch(() => {});
@@ -180,13 +195,22 @@ function getServerMusicSnapshot(): MusicRuntimeState {
   return SERVER_MUSIC_SNAPSHOT;
 }
 
+function trackFromState(state: MusicRuntimeState): MusicTrack | null {
+  if (!state.trackId) return null;
+  const theme = state.theme as MusicTheme;
+  return TRACKS_BY_THEME[theme]?.find(t => t.id === state.trackId) ?? null;
+}
+
 export function useMusicPlayer() {
+  // 水合阶段用 getServerMusicSnapshot；track/tracks 必须从同一 snapshot 推导，
+  // 不可再读模块级 runtime（否则客户端会提前看到 localStorage 曲目）
   const state = useSyncExternalStore(subscribeMusic, getMusicSnapshot, getServerMusicSnapshot);
+  const theme = state.theme as MusicTheme;
 
   return {
     state,
-    track: getCurrentTrack(),
-    tracks: getThemeTracks(),
+    track: trackFromState(state),
+    tracks: TRACKS_BY_THEME[theme] ?? [],
     actions: musicActions,
   };
 }

@@ -2,6 +2,7 @@ import { getContentById, getEntryById } from '@/lib/data';
 import { parseText } from '@/lib/text-parser';
 import { applyOverrides } from '@/lib/parser-overrides';
 import { injectRitualIllustrations } from '@/lib/ritual-illustrations';
+import { injectDaozangImages } from '@/lib/daozang-images';
 import { ParsedBook } from '@/lib/content-schema';
 import { paginateBlocks, BookPage } from '@/lib/book-pagination';
 import { enrichTocWithPages, EnrichedTocItem } from '@/lib/toc-enriched';
@@ -10,8 +11,12 @@ export function loadParsedBook(bookId: string): ParsedBook | null {
   const entry = getEntryById(bookId);
   if (!entry) return null;
   const content = getContentById(bookId);
+  // 原文解析 → 人工校正 → 原书插图 → 科仪 AI 示意图。原图先于 AI，避免示意图抢锚点。
   return injectRitualIllustrations(
-    applyOverrides(parseText(content, bookId, entry.title)),
+    injectDaozangImages(
+      applyOverrides(parseText(content, bookId, entry.title)),
+      content,
+    ),
   );
 }
 

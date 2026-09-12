@@ -59,6 +59,12 @@ export interface ContentBlock {
   confidence: number;
   /** 解析器标识，如 "rule-v1" */
   parser: string;
+  /** 原扫描 URL；复原图悬停/长按对照用，不得被复原顶替 */
+  originalSrc?: string;
+  /** 墨线透明 PNG */
+  inkSrc?: string;
+  /** 朱砂透明 PNG */
+  cinnabarSrc?: string;
 }
 
 /** 低置信度阈值：低于此值的识别结果视为「待人工审核」 */

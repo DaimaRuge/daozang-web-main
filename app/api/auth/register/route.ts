@@ -19,12 +19,12 @@ export async function POST(req: Request) {
   if (!password || password.length < 6) {
     return NextResponse.json({ error: '密码至少 6 位' }, { status: 400 });
   }
-  if (findUserByEmail(email)) {
+  if (await findUserByEmail(email)) {
     return NextResponse.json({ error: '该邮箱已注册' }, { status: 409 });
   }
 
   const hash = await bcrypt.hash(password, 10);
-  const user = createUser(email, hash, body.name);
+  const user = await createUser(email, hash, body.name);
 
   return NextResponse.json({
     ok: true,

@@ -5,7 +5,9 @@ import {
   isFootnoteDefinition,
   parseFootnoteDefinition,
 } from '@/lib/footnotes';
+import { mediaUrl } from '@/lib/media-url';
 import InlineText from './InlineText';
+import DaozangFigure from './DaozangFigure';
 
 /**
  * 内容块渲染器。
@@ -26,21 +28,47 @@ export default function BlockRenderer({
   showEditorNotes,
   footnoteIndex,
   onFootnoteNavigate,
+  annotationCounts,
+  onAnnotationClick,
+  bookId,
 }: {
   blocks: ContentBlock[];
   showEditorNotes: boolean;
   footnoteIndex?: FootnoteIndex;
   onFootnoteNavigate?: (targetBlockId: string) => void;
+  /** 各内容块的公开旁注数量，用于行末徽章 */
+  annotationCounts?: Record<string, number>;
+  /** 点击行末旁注徽章：展开该块的旁注（移动端底部抽屉 / 桌面定位） */
+  onAnnotationClick?: (blockId: string) => void;
+  bookId?: string;
 }) {
-  /** 含 #N 的文本统一走 InlineText，标题/正文/注疏均适用 */
-  const renderText = (block: ContentBlock, content: string) => (
-    <InlineText
-      content={content}
-      blockId={block.id}
-      footnoteIndex={footnoteIndex}
-      onFootnoteNavigate={onFootnoteNavigate}
-    />
-  );
+  /** 含 #N 的文本统一走 InlineText，标题/正文/注疏均适用；行末附旁注徽章 */
+  const renderText = (block: ContentBlock, content: string) => {
+    const count = annotationCounts?.[block.id] ?? 0;
+    return (
+      <>
+        <InlineText
+          content={content}
+          blockId={block.id}
+          footnoteIndex={footnoteIndex}
+          onFootnoteNavigate={onFootnoteNavigate}
+        />
+        {count > 0 && (
+          <button
+            type="button"
+            className="anno-badge"
+            onClick={e => {
+              e.stopPropagation();
+              onAnnotationClick?.(block.id);
+            }}
+            aria-label={`查看 ${count} 条读者旁注`}
+          >
+            {count}
+          </button>
+        )}
+      </>
+    );
+  };
 
   /** 校勘脚注条目：弱化于原文、强于裸段落，编号徽章 + 条目正文 */
   const renderFootnoteDef = (block: ContentBlock) => {
@@ -128,12 +156,29 @@ export default function BlockRenderer({
             );
           case 'separator':
             return <hr key={block.id} {...common} className="block-separator" />;
-          case 'image':
+          case 'image': {
+            const isScan = block.parser === 'daozang-scan' || block.parser === 'daozang-restored';
+            const isRestored = block.parser === 'daozang-restored';
+            if (isScan) {
+              return (
+                <figure key={block.id} {...common} className="block-image my-6">
+                  <DaozangFigure
+                    src={block.content}
+                    originalSrc={block.originalSrc}
+                    inkSrc={block.inkSrc}
+                    cinnabarSrc={block.cinnabarSrc}
+                    restored={isRestored}
+                    alt="原书插图"
+                    bookId={bookId}
+                  />
+                </figure>
+              );
+            }
             return (
               <figure key={block.id} {...common} className="block-image my-6">
                 <div className="relative w-full aspect-[4/3] rounded-lg overflow-hidden border border-[var(--border)] bg-[var(--card)]">
                   <Image
-                    src={block.content}
+                    src={mediaUrl(block.content)}
                     alt="科仪示意图"
                     fill
                     sizes="(max-width: 768px) 100vw, 640px"
@@ -142,13 +187,21 @@ export default function BlockRenderer({
                 </div>
               </figure>
             );
-          case 'image-caption':
+          }
+          case 'image-caption': {
+            const label =
+              block.parser === 'daozang-scan'
+                ? '原书插图'
+                : block.parser === 'daozang-restored'
+                  ? '原书插图 · AI 复原'
+                  : '示意图 · AI 生成';
             return (
               <figcaption key={block.id} {...common} className="block-image-caption">
-                <span className="text-[var(--cinnabar)] mr-1">〔示意图 · AI 生成〕</span>
+                <span className="text-[var(--cinnabar)] mr-1">〔{label}〕</span>
                 {renderText(block, block.content)}
               </figcaption>
             );
+          }
           case 'ai-explanation':
             return (
               <aside key={block.id} {...common} className="block-editor-note">

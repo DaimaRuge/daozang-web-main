@@ -93,7 +93,7 @@ export async function startIllustrationJob(req: IllustrationRequest): Promise<{
   imageUrl?: string;
 }> {
   const type = req.type ?? 'scene';
-  const existing = findIllustrationByBlock(req.bookId, req.blockId, type);
+  const existing = await findIllustrationByBlock(req.bookId, req.blockId, type);
   if (existing?.status === 'done' && existing.image_url) {
     return { jobId: existing.id, status: 'done', imageUrl: existing.image_url };
   }
@@ -102,12 +102,12 @@ export async function startIllustrationJob(req: IllustrationRequest): Promise<{
   }
 
   const jobId = `illus_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
-  createIllustrationJob(jobId, req.bookId, req.blockId, req.text, type);
+  await createIllustrationJob(jobId, req.bookId, req.blockId, req.text, type);
 
-  // 异步生成，不阻塞 HTTP 响应
-  void runIllustrationJob(jobId, req).catch(err => {
+  // 异步生成，不阻塞 HTTP 响应；内部 update 必须 await，否则失败态可能丢写。
+  void runIllustrationJob(jobId, req).catch(async err => {
     console.error('[illustration]', jobId, err);
-    updateIllustrationJob(jobId, {
+    await updateIllustrationJob(jobId, {
       status: 'failed',
       error: err instanceof Error ? err.message : '生成失败',
     });
@@ -117,13 +117,13 @@ export async function startIllustrationJob(req: IllustrationRequest): Promise<{
 }
 
 async function runIllustrationJob(jobId: string, req: IllustrationRequest): Promise<void> {
-  updateIllustrationJob(jobId, { status: 'processing' });
+  await updateIllustrationJob(jobId, { status: 'processing' });
 
   const entry = getEntryById(req.bookId);
   const bookTitle = entry?.title ?? '道藏典籍';
 
   const prompt = await buildIllustrationPrompt(req.text, bookTitle);
-  updateIllustrationJob(jobId, { prompt });
+  await updateIllustrationJob(jobId, { prompt });
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
   const nodeName = `gen-${req.bookId.slice(0, 8)}-${req.blockId.slice(0, 8)}`;
@@ -134,14 +134,14 @@ async function runIllustrationJob(jobId: string, req: IllustrationRequest): Prom
   const localPath = path.join(OUT_DIR, fileName);
   await downloadImage(remoteUrl, localPath);
 
-  updateIllustrationJob(jobId, {
+  await updateIllustrationJob(jobId, {
     status: 'done',
     image_url: `/images/gen/${fileName}`,
   });
 }
 
-export function getIllustrationStatus(jobId: string) {
-  const job = getIllustrationJob(jobId);
+export async function getIllustrationStatus(jobId: string) {
+  const job = await getIllustrationJob(jobId);
   if (!job) return null;
   return {
     jobId: job.id,

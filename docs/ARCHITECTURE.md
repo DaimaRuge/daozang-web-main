@@ -8,20 +8,24 @@
 
 | 层 | 选型 |
 |---|---|
-| 框架 | Next.js 16（App Router，Turbopack） |
-| UI | React 19 + Tailwind CSS 4（CSS 变量设计令牌） |
+| 框架 | Next.js 16.3（App Router，Turbopack） |
+| UI | React 19 + Tailwind CSS 4（CSS 变量设计令牌；无 UI 组件库） |
 | 语言 | TypeScript |
-| 数据 | 静态 JSON（构建期由 `scripts/build-index.ts` 从 txt 生成） |
+| 典籍数据 | 静态 JSON（构建期由 `scripts/build-index.ts` 从 txt 生成；原文不进 CMS） |
+| 用户数据 | PostgreSQL（Neon 生产 / Docker 本地；无 ORM） |
+| 对象存储 | Cloudflare R2（生产）/ MinIO（本地）；S3 兼容 |
+| 账号 | Auth.js Credentials + JWT；角色 `reader < contributor < moderator < editor < admin` |
+| LLM | `@earendil-works/pi-agent-core` + `pi-ai`（`DZ_LLM_PROVIDER` 切换供应商） |
 | 测试 | Node 内置 test runner（`npm test`，经 tsx 执行） |
-| 部署 | Vercel |
+| 部署 | Vercel（海外版优先；大陆版推迟） |
 
 ### 模块边界
 
 ```text
-app/                    页面与 API 路由（只做编排，不含业务逻辑）
-  text/[id]/            阅读页（服务端组件：取数 + 解析 + SEO 元数据）
-  library/              我的书房（客户端：本地数据）
-  api/agent/            Agent API v1（工具调用 + chat 占位）
+app/
+  (site)/               前台（阅读器 / 道乐 / 来稿 / /studio）
+  (payload)/            Payload CMS（/admin，独立 html，另一套登录）
+  api/                  前台 API（比 Payload 的 /api/[...slug] 更具体，优先匹配）
 components/
   reader/               阅读器组件族（编排/渲染/目录/设置/划词/笔记 各自独立）
 lib/
@@ -31,6 +35,10 @@ lib/
   zh-convert.ts         简繁转换（opencc-js），检索层查询变体扩展
   data.ts               索引与原文读取（服务端）
   fulltext-search.ts    全文检索（内存语料 + 简繁变体并集）
+  db.ts / pg.ts         Postgres 用户数据（进度、配额、UGC、审核记录）
+  auth-role.ts          角色等级与 requireRole / requireActiveUser
+  moderation/           区域策略矩阵与硬规则前置
+  storage.ts / media-url.ts  对象存储与公开媒体 URL
   user-data.ts          用户数据模型与本地存储（进度/收藏/笔记/设置/事件）
   use-local-data.ts     水合安全的本地数据 Hook
   ask-context.ts        阅读页 → 问道页的上下文交接（sessionStorage）
@@ -59,7 +67,7 @@ flowchart LR
   Provider -.->|待接入| LLM[模型供应商]
 ```
 
-模型永不直接访问数据；一切经 `executeTool` 的权限检查、输入校验与日志。供应商通过 `getProvider()` 工厂切换，密钥仅存服务端环境变量。
+  模型永不直接访问数据；一切经 `executeTool` 的权限检查、输入校验与日志。供应商通过 `getProvider()` → `@earendil-works/pi-ai` 切换（`DZ_LLM_PROVIDER`），密钥仅存服务端环境变量。UGC 初审走 `pi-agent-core` 的结构化工具调用，失败降级为人工队列。
 
 ## 二、本轮修改报告
 
