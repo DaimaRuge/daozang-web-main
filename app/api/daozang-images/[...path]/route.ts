@@ -14,6 +14,13 @@ interface RouteParams {
 
 const ALLOWED_EXT = new Set(['.jpg', '.jpeg', '.png', '.webp']);
 
+function contentType(file: string): string {
+  const ext = path.extname(file).toLowerCase();
+  if (ext === '.png') return 'image/png';
+  if (ext === '.webp') return 'image/webp';
+  return 'image/jpeg';
+}
+
 function sniffContentType(file: string, buf: Buffer): string {
   if (buf.length >= 8 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
     return 'image/png';
