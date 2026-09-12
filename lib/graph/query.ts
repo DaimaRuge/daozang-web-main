@@ -17,6 +17,7 @@
 
 import {
   EDGE_LABELS,
+  GraphCitation,
   GraphEdge,
   GraphEdgeType,
   GraphNode,
@@ -42,6 +43,17 @@ interface GraphRuntime {
 }
 
 let _runtime: GraphRuntime | null | undefined;
+/** 对话检索用的本体词表（标签 + 别名），随 runtime 一起失效 */
+let _lexicon: readonly string[] | undefined;
+
+const LEXICON_TYPES = new Set([
+  'concept',
+  'deity',
+  'person',
+  'place',
+  'ritual',
+  'sect',
+]);
 
 /**
  * 加载图谱产物并叠加人工校正。产物缺失时返回 null 而不是抛错 ——
@@ -88,6 +100,56 @@ function getRuntime(): GraphRuntime | null {
 /** 审核写入 overrides 后必须失效，否则本进程仍读旧邻接表 */
 export function resetGraphRuntime(): void {
   _runtime = undefined;
+  _lexicon = undefined;
+}
+
+/**
+ * 本体词表表面词形（含别名），供对话检索做最长匹配分词。
+ * 不含典籍/部类/标签/图像：那些由书名号与目录检索处理，放进问句分词会抢名额。
+ */
+export function getConceptLexicon(): readonly string[] {
+  if (_lexicon) return _lexicon;
+  const rt = getRuntime();
+  if (!rt) {
+    _lexicon = [];
+    return _lexicon;
+  }
+  const terms: string[] = [];
+  const seen = new Set<string>();
+  for (const node of rt.graph.nodes) {
+    if (!LEXICON_TYPES.has(node.type)) continue;
+    if (node.origin === 'query') continue;
+    for (const form of [node.label, ...(node.aliases ?? [])]) {
+      const key = form.trim();
+      if (key.length < 2 || seen.has(key)) continue;
+      seen.add(key);
+      terms.push(key);
+    }
+  }
+  _lexicon = terms;
+  return _lexicon;
+}
+
+/**
+ * 问句概念 → 图谱提及边的原文出处。
+ * 命中实体时用构建期扫好的 blockId 引文，避免再跑一遍全文检索。
+ */
+export function mentionCitationsForQuery(query: string, limit = 2): GraphCitation[] {
+  const node = resolveQuery(query);
+  if (!node) return [];
+  const view = expandNode(node.id, Math.max(limit, 3));
+  const group = view?.groups.find(g => g.type === 'mentioned_in');
+  if (!group) return [];
+  const out: GraphCitation[] = [];
+  const seen = new Set<string>();
+  for (const item of group.items) {
+    const c = item.edge.citations?.[0];
+    if (!c || seen.has(c.bookId)) continue;
+    seen.add(c.bookId);
+    out.push(c);
+    if (out.length >= limit) break;
+  }
+  return out;
 }
 
 /** 图谱是否可用（UI 据此决定是否渲染入口，而不是渲染一个空面板） */

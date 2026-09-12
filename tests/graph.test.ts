@@ -23,9 +23,11 @@ import {
 import { GraphView, nodeId, parseNodeId } from '../lib/graph/schema';
 import {
   expandNode,
+  getConceptLexicon,
   graphForWork,
   graphViewForQuery,
   isGraphAvailable,
+  mentionCitationsForQuery,
   resolveQuery,
 } from '../lib/graph/query';
 import { GRAPH_ARTIFACT_MAX_BYTES, loadKnowledgeGraph } from '../lib/graph/load';
@@ -340,6 +342,25 @@ test('查询：自动抽取节点若存在则不带编造释义', skipReason, ()
   if (graph.stats.autoEntities) {
     assert.equal(autos.length, graph.stats.autoEntities);
     assert.ok(autos.length >= 1000, `词表二期应并入至少 1000 条自动术语，实际 ${autos.length}`);
+  }
+});
+
+test('查询：本体词表含策展与自动术语，不含书名', skipReason, () => {
+  const lexicon = getConceptLexicon();
+  assert.ok(lexicon.includes('無為'), '策展词应在词表中');
+  assert.ok(lexicon.includes('无为'), '简体别名应在词表中，供简体问句直接命中');
+  assert.ok(lexicon.length >= 1000, `词表应覆盖并入的自动术语，实际 ${lexicon.length}`);
+  assert.ok(!lexicon.some(t => t.includes('道法會元')), '典籍名不得进入对话分词词表');
+});
+
+test('查询：概念出处带回 blockId，供问答引用', skipReason, () => {
+  const cites = mentionCitationsForQuery('無為', 2);
+  assert.ok(cites.length > 0, '無為应有提及出处');
+  assert.ok(cites.length <= 2);
+  for (const c of cites) {
+    assert.ok(c.bookId && c.bookTitle);
+    assert.ok(c.blockId, '问答引用需要能跳回原文的 blockId');
+    assert.ok(c.blockId!.startsWith(`${c.bookId}-b`), c.blockId);
   }
 });
 

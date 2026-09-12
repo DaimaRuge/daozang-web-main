@@ -4,8 +4,8 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
+import { extractConcepts } from '../lib/agent/concepts';
 import { queryVariants } from '../lib/zh-convert';
-import { extractConcepts } from '../lib/agent/chat';
 
 test('简体查询扩展出繁体变体', () => {
   const variants = queryVariants('道德经');
@@ -50,4 +50,40 @@ test('概念提取：多概念问句分别提取', () => {
 test('概念提取：最多返回 3 个候选', () => {
   const concepts = extractConcepts('内丹 外丹 符箓 斋醮 存思 坐忘');
   assert.ok(concepts.length <= 3);
+});
+
+test('概念提取：词表能从嵌套句子里抽出术语', () => {
+  const lexicon = ['橐籥', '符籙', '無為', '无为'];
+  const concepts = extractConcepts('道藏里讲橐籥的地方在哪', { lexicon });
+  assert.deepEqual(concepts, ['橐籥']);
+});
+
+test('概念提取：同一实体的别名只保留一条', () => {
+  const lexicon = ['無為', '无为', '清靜無為', '清静无为'];
+  const concepts = extractConcepts('什么是清静无为？', {
+    lexicon,
+    variants: queryVariants,
+    canonicalId: term => (term.includes('为') || term.includes('為') || term.includes('爲') ? 'concept:wuwei' : undefined),
+  });
+  assert.equal(concepts.length, 1, `别名应合并，实际：${concepts.join(',')}`);
+});
+
+test('概念提取：词表最长匹配优先于短别名', () => {
+  const lexicon = ['無為', '清靜無為', '清静无为'];
+  const concepts = extractConcepts('什么是清静无为？', {
+    lexicon,
+    variants: queryVariants,
+  });
+  assert.ok(
+    concepts.includes('清靜無為') || concepts.includes('清静无为'),
+    `应命中「清靜無為」，实际：${concepts.join(',')}`,
+  );
+  assert.ok(!concepts.includes('無為'), '短词不应从长匹配里再拆出来');
+});
+
+test('概念提取：无词表时行为与停用词切分一致', () => {
+  assert.deepEqual(
+    extractConcepts('内丹与外丹有什么区别？'),
+    extractConcepts('内丹与外丹有什么区别？', { lexicon: [] }),
+  );
 });
