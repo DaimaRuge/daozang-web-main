@@ -5,6 +5,7 @@ import { parseText } from '@/lib/text-parser';
 import { loadOverrides, overrideKey } from '@/lib/parser-overrides';
 import { LOW_CONFIDENCE } from '@/lib/content-schema';
 import ReviewClient, { ReviewItem } from './ReviewClient';
+import ReviewHubNav from './ReviewHubNav';
 
 /**
  * 低置信度块人工审核页（仅开发环境，服务端组件）。
@@ -34,7 +35,7 @@ export default async function ReviewPage({ searchParams }: PageProps) {
     const entry = getEntryById(book);
     if (!entry) notFound();
 
-    const parsed = parseText(getContentById(book), book, entry.title);
+    const parsed = parseText(await getContentById(book), book, entry.title);
     const bookOverrides = overrides[book] ?? {};
 
     // 审核对象：低置信度块 + 已有人工校正的块（可复查/撤销）
@@ -59,6 +60,7 @@ export default async function ReviewPage({ searchParams }: PageProps) {
 
     return (
       <div className="animate-fade-in">
+        <ReviewHubNav current="parse" />
         <ReviewHeader />
         <div className="mb-6 pb-4 border-b border-[var(--border)]">
           <h2 className="text-lg font-serif tracking-wide">{entry.title}</h2>
@@ -80,6 +82,7 @@ export default async function ReviewPage({ searchParams }: PageProps) {
 
   return (
     <div className="animate-fade-in max-w-2xl">
+      <ReviewHubNav current="parse" />
       <ReviewHeader />
 
       <form action="/review" method="get" className="mb-8">
@@ -128,6 +131,7 @@ export default async function ReviewPage({ searchParams }: PageProps) {
       <p className="text-xs text-[var(--muted)] mt-10 leading-relaxed">
         提示：优先审核 docs/parse-report.md 中「低置信度占比最高」的典籍。
         校正结果写入 data/parser-overrides.json，请随代码一并提交。
+        图谱待考关系请到「图谱关系」分栏。
       </p>
     </div>
   );

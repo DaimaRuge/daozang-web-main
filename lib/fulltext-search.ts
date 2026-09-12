@@ -1,7 +1,6 @@
-import fs from 'fs';
-import path from 'path';
 import { getIndex, DaozangEntry } from './data';
 import { queryVariants } from './zh-convert';
+import { readContent, readContentSync } from './public-data';
 
 /**
  * 全文检索（服务端，v1：内存线性扫描）。
@@ -13,7 +12,10 @@ import { queryVariants } from './zh-convert';
  * 3. 本模块对外只暴露 searchFullText 接口 —— 搜索实现与调用方解耦，
  *    未来替换为索引服务时（接口不变）调用方零改动。
  *
- * 注意：仅服务端使用（依赖 fs），冷启动首次查询会有一次性加载成本。
+ * 为什么改成 async、且不在本文件拼接 public/data/content 动态路径：
+ * NFT 会把整目录打进 Serverless Function（约 100MB），Vercel 预览失败。
+ * 本地磁盘在时仍走 fs；Vercel 上按需从 CDN 拉（见 lib/public-data.ts）。
+ * 冷启动首次查询会有一次性加载成本。
  */
 
 export interface FullTextHit {
@@ -32,22 +34,45 @@ interface CorpusDoc {
 }
 
 let _corpus: CorpusDoc[] | null = null;
+let _loading: Promise<CorpusDoc[]> | null = null;
 
-/** 语料懒加载并缓存于模块级内存（每个服务进程仅一次） */
-function loadCorpus(): CorpusDoc[] {
+const FETCH_CONCURRENCY = 16;
+
+async function loadCorpus(): Promise<CorpusDoc[]> {
   if (_corpus) return _corpus;
-  const contentDir = path.resolve(process.cwd(), 'public/data/content');
-  const docs: CorpusDoc[] = [];
-  for (const entry of getIndex().entries) {
-    try {
-      const raw = JSON.parse(fs.readFileSync(path.join(contentDir, `${entry.id}.json`), 'utf-8'));
-      docs.push({ entry, text: raw.content as string });
-    } catch {
-      // 个别缺失文件不阻断整体检索
+  if (_loading) return _loading;
+  _loading = (async () => {
+    const entries = getIndex().entries;
+    const docs: CorpusDoc[] = [];
+
+    // 本地：磁盘上有第一部即可整库 fs 读取，避免 1504 次 HTTP
+    const first = readContentSync(entries[0]?.id ?? '');
+    if (first || entries.length === 0) {
+      if (first && entries[0]) docs.push({ entry: entries[0], text: first });
+      for (const entry of entries.slice(1)) {
+        const text = readContentSync(entry.id);
+        if (text) docs.push({ entry, text });
+      }
+      _corpus = docs;
+      return docs;
     }
-  }
-  _corpus = docs;
-  return docs;
+
+    for (let i = 0; i < entries.length; i += FETCH_CONCURRENCY) {
+      const batch = entries.slice(i, i + FETCH_CONCURRENCY);
+      const parts = await Promise.all(
+        batch.map(async entry => {
+          const text = await readContent(entry.id);
+          return text ? { entry, text } : null;
+        }),
+      );
+      for (const doc of parts) {
+        if (doc) docs.push(doc);
+      }
+    }
+    _corpus = docs;
+    return docs;
+  })();
+  return _loading;
 }
 
 /** 从命中位置截取上下文摘要，规整空白以便单行展示 */
@@ -59,19 +84,20 @@ function makeSnippet(text: string, pos: number, queryLen: number): string {
   return prefix + text.slice(start, end).replace(/[\s\u3000]+/g, ' ').trim() + suffix;
 }
 
-export function searchFullText(
+export async function searchFullText(
   query: string,
   page = 1,
   pageSize = 20,
-): { results: FullTextHit[]; total: number } {
+): Promise<{ results: FullTextHit[]; total: number }> {
   const q = query.trim();
   if (!q) return { results: [], total: 0 };
 
   // 简体查询自动扩展繁体变体（语料为繁体），按变体并集检索
   const variants = queryVariants(q);
+  const corpus = await loadCorpus();
 
   const hits: FullTextHit[] = [];
-  for (const doc of loadCorpus()) {
+  for (const doc of corpus) {
     // 找到第一个命中的词形；同一部书按首个命中变体统计
     let matched = '';
     let firstPos = -1;

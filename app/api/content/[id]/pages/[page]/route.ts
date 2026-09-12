@@ -20,7 +20,7 @@ export async function GET(_req: Request, { params }: RouteParams) {
   const entry = getEntryById(id);
   if (!entry) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const content = getContentById(id);
+  const content = await getContentById(id);
   const parsed = injectRitualIllustrations(
     applyOverrides(parseText(content, id, entry.title)),
   );

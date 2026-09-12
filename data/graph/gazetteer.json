@@ -1,0 +1,721 @@
+{
+  "$comment": "道藏知识图谱策展词表（第三层内容）。人工维护、随代码提交、可审可改。aliases 用于全库原文扫描与查询解析，必须包含语料中的繁体与异体词形（语料为繁体且异体不统一）。shortDef 是策展释义，UI 必须标注「词表释义」，不得与典籍原文混排。新增条目请保持 id 稳定，改 id 等于换实体。",
+  "version": 1,
+  "entries": [
+    {
+      "id": "fulu",
+      "type": "concept",
+      "label": "符籙",
+      "aliases": ["符籙", "符箓", "符錄", "符簶"],
+      "shortDef": "道教以特定笔画、文字与图形书写的凭信之物。符主召役与禁制，籙为受法者名册与职任凭证，二者常并称。",
+      "seedEdges": [
+        { "to": "zhoujue", "type": "related_to" },
+        { "to": "leifa", "type": "related_to" },
+        { "to": "shoulu", "type": "related_to" },
+        { "to": "zhengyi", "type": "related_to" },
+        { "to": "jiaotan", "type": "related_to" },
+        { "to": "fayin", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "shenfu",
+      "type": "concept",
+      "label": "神符",
+      "aliases": ["神符", "靈符", "灵符", "寶符", "玉符"],
+      "shortDef": "具神力的符文，多以召神遣将、驱邪治病、护身镇宅为用。《道藏》三洞各部设「神符類」专收此类文献。",
+      "seedEdges": [{ "to": "fulu", "type": "subclass_of" }]
+    },
+    {
+      "id": "falu",
+      "type": "concept",
+      "label": "法籙",
+      "aliases": ["法籙", "法箓", "寶籙", "真籙", "經籙"],
+      "shortDef": "受法者所受的品阶名籙，标示其可行法事的范围与所统神将，是道门传度制度的核心凭证。",
+      "seedEdges": [
+        { "to": "fulu", "type": "subclass_of" },
+        { "to": "shoulu", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "fayin",
+      "type": "concept",
+      "label": "法印",
+      "aliases": ["法印", "道印", "寶印", "印篆"],
+      "shortDef": "行法所用印章，钤于符牒章奏以示法权，常与符籙配套使用。"
+    },
+    {
+      "id": "zhoujue",
+      "type": "concept",
+      "label": "咒訣",
+      "aliases": ["咒訣", "呪訣", "咒诀", "秘訣", "口訣"],
+      "shortDef": "行法时诵念的咒语与配套手诀、心法。咒主感召，诀主运用，与符籙同为科法的基本构件。",
+      "seedEdges": [{ "to": "shenzhou", "type": "related_to" }]
+    },
+    {
+      "id": "shenzhou",
+      "type": "concept",
+      "label": "神咒",
+      "aliases": ["神咒", "神呪", "真言", "禁咒", "禁呪"],
+      "shortDef": "具威力的咒文，用于召神、遣将、遏制邪祟，常见「某某神咒」独立成篇。",
+      "seedEdges": [{ "to": "zhoujue", "type": "subclass_of" }]
+    },
+    {
+      "id": "leifa",
+      "type": "concept",
+      "label": "雷法",
+      "aliases": ["雷法", "雷霆", "五雷", "神霄雷法"],
+      "shortDef": "宋元以降盛行的以雷霆之力行法的法术体系，以神霄、清微诸派最盛，主祈雨、驱邪、伐庙。",
+      "seedEdges": [
+        { "to": "shenxiao", "type": "related_to" },
+        { "to": "fulu", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "bugang",
+      "type": "concept",
+      "label": "步罡",
+      "aliases": ["步罡", "罡步", "踏斗", "步虛"],
+      "shortDef": "行法时按星斗方位踏步行走的仪式动作，以身体运动模拟天象运行。"
+    },
+    {
+      "id": "jiaotan",
+      "type": "concept",
+      "label": "醮壇",
+      "aliases": ["醮壇", "醮坛", "壇場", "法壇", "道場"],
+      "shortDef": "举行斋醮法事的坛场，按方位布设神位、幡幢与法器，是仪式的空间秩序。"
+    },
+    {
+      "id": "zhangzou",
+      "type": "concept",
+      "label": "章奏",
+      "aliases": ["章奏", "表奏", "上章", "奏狀", "詞文"],
+      "shortDef": "以官府文书体式上奏天曹的文本，为道门沟通神界的正式程式。《道藏》设「表奏類」专收。"
+    },
+    {
+      "id": "neidan",
+      "type": "concept",
+      "label": "內丹",
+      "aliases": ["內丹", "内丹", "丹道"],
+      "shortDef": "以自身精气神为药物、以身体为鼎炉的内修体系，与炼制外物的外丹相对，唐宋以后成为道教修炼主流。",
+      "seedEdges": [
+        { "to": "jindan", "type": "related_to" },
+        { "to": "xingming", "type": "related_to" },
+        { "to": "qianguang", "type": "related_to" },
+        { "to": "zhoutian", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "waidan",
+      "type": "concept",
+      "label": "外丹",
+      "aliases": ["外丹", "爐火", "黃白", "金石藥"],
+      "shortDef": "以炉火烧炼丹砂、铅汞等矿物药求长生的技术传统，唐以前盛行，后渐让位于内丹。"
+    },
+    {
+      "id": "jindan",
+      "type": "concept",
+      "label": "金丹",
+      "aliases": ["金丹", "還丹", "大丹", "神丹"],
+      "shortDef": "丹道所成之「丹」，外丹指所炼药物，内丹借为身中结成之丹，象征生命的凝定与转化。"
+    },
+    {
+      "id": "qianguang",
+      "type": "concept",
+      "label": "鉛汞",
+      "aliases": ["鉛汞", "铅汞", "龍虎", "水火", "金木"],
+      "shortDef": "丹道以铅汞、龙虎等成对意象喻身中阴阳二物，取其相反相成之义，非实指矿物。"
+    },
+    {
+      "id": "dinglu",
+      "type": "concept",
+      "label": "鼎爐",
+      "aliases": ["鼎爐", "鼎炉", "爐鼎", "玄關"],
+      "shortDef": "外丹的实物器具，内丹借喻身中炼养的处所与火候节度。"
+    },
+    {
+      "id": "zhoutian",
+      "type": "concept",
+      "label": "周天",
+      "aliases": ["周天", "河車", "運火", "抽添"],
+      "shortDef": "内丹修炼中气机循身运行一周的过程，以天体周行为喻，讲究火候次第。"
+    },
+    {
+      "id": "xingming",
+      "type": "concept",
+      "label": "性命",
+      "aliases": ["性命", "性命雙修", "命功", "性功"],
+      "shortDef": "「性」指心性神识，「命」指形体精气。内丹主张双修性命，不偏于一端。"
+    },
+    {
+      "id": "jingqishen",
+      "type": "concept",
+      "label": "精氣神",
+      "aliases": ["精氣神", "精气神", "三寶", "元神"],
+      "shortDef": "道教生命论的三个层级，为内修炼养的对象，讲究炼精化气、炼气化神。"
+    },
+    {
+      "id": "cunsi",
+      "type": "concept",
+      "label": "存思",
+      "aliases": ["存思", "存想", "內觀", "內視"],
+      "shortDef": "以意念内观身中神真、宫室、星象的修法，为上清一系的核心法门。",
+      "seedEdges": [{ "to": "shangqing", "type": "related_to" }]
+    },
+    {
+      "id": "taixi",
+      "type": "concept",
+      "label": "胎息",
+      "aliases": ["胎息", "服氣", "服气", "行氣", "調息"],
+      "shortDef": "呼吸修炼之法，追求气息绵长如胎儿在母腹中不以口鼻呼吸的状态。"
+    },
+    {
+      "id": "daoyin",
+      "type": "concept",
+      "label": "導引",
+      "aliases": ["導引", "导引", "按摩", "肢體"],
+      "shortDef": "以肢体屈伸配合呼吸的养生术，常与服气、按摩并行。"
+    },
+    {
+      "id": "zuowang",
+      "type": "concept",
+      "label": "坐忘",
+      "aliases": ["坐忘", "守一", "抱一", "定觀"],
+      "shortDef": "澄心去执、渐忘物我的静定修法，司马承祯《坐忘论》为其代表文献。",
+      "seedEdges": [{ "to": "simachengzhen", "type": "related_to" }]
+    },
+    {
+      "id": "huangting",
+      "type": "concept",
+      "label": "黃庭",
+      "aliases": ["黃庭", "黄庭", "泥丸", "丹田"],
+      "shortDef": "身中要位之称，《黄庭经》以之为存思炼养的枢机，后成内修身体图式的通名。"
+    },
+    {
+      "id": "wuwei",
+      "type": "concept",
+      "label": "無為",
+      "aliases": ["無為", "無爲", "无为", "自然"],
+      "shortDef": "《老子》核心主张，指不妄作、循物性而行，非消极不动。"
+    },
+    {
+      "id": "qingjing",
+      "type": "concept",
+      "label": "清靜",
+      "aliases": ["清靜", "清净", "清靜無為", "澄心"],
+      "shortDef": "去欲息虑、心神澄定的修养境地，《清静经》专述此义。"
+    },
+    {
+      "id": "yinyang",
+      "type": "concept",
+      "label": "陰陽",
+      "aliases": ["陰陽", "阴阳", "乾坤"],
+      "shortDef": "相对相成的两种势用，是道教宇宙论、丹道与术数共用的基本框架。"
+    },
+    {
+      "id": "wuxing",
+      "type": "concept",
+      "label": "五行",
+      "aliases": ["五行", "金木水火土", "五運"],
+      "shortDef": "金木水火土五种势用及其生克关系，广用于医、丹、术数与仪式方位安排。"
+    },
+    {
+      "id": "taiji",
+      "type": "concept",
+      "label": "太極",
+      "aliases": ["太極", "太极", "先天", "無極"],
+      "shortDef": "阴阳未分或将分之本始状态，宋以后成为丹道与易学论生成的关键概念。"
+    },
+    {
+      "id": "yuanqi",
+      "type": "concept",
+      "label": "元氣",
+      "aliases": ["元氣", "元气", "元炁", "一炁", "先天氣"],
+      "shortDef": "构成万物与生命的本始之气，丹道以之为炼养的根本。"
+    },
+    {
+      "id": "changsheng",
+      "type": "concept",
+      "label": "長生",
+      "aliases": ["長生", "长生", "久視", "不死", "度世"],
+      "shortDef": "道教修行的核心期许，涵盖延年、成真、飞升等不同层级的表述。"
+    },
+    {
+      "id": "chengfu",
+      "type": "concept",
+      "label": "承負",
+      "aliases": ["承負", "承负", "餘慶", "餘殃"],
+      "shortDef": "善恶果报累及先后世代的观念，见于《太平经》一系，与佛教业报说取径不同。"
+    },
+    {
+      "id": "ganying",
+      "type": "concept",
+      "label": "感應",
+      "aliases": ["感應", "感应", "冥感", "靈驗"],
+      "shortDef": "人之诚敬与神明回应之间的呼应关系，是灵验记与劝善文献的核心逻辑。"
+    },
+    {
+      "id": "sanqing",
+      "type": "concept",
+      "label": "三清",
+      "aliases": ["三清", "玉清", "上清境", "太清境"],
+      "shortDef": "玉清、上清、太清三重天境及其主神的合称，道教神学的顶层结构。"
+    },
+    {
+      "id": "sanjie",
+      "type": "concept",
+      "label": "三界",
+      "aliases": ["三界", "天曹", "地府", "水府"],
+      "shortDef": "天、地、水（或天、人、地）三重界域，道门法事文书多以三界职司为行文对象。"
+    },
+    {
+      "id": "jiuyou",
+      "type": "concept",
+      "label": "九幽",
+      "aliases": ["九幽", "酆都", "地獄", "冥司"],
+      "shortDef": "幽冥世界及其职司，度亡、炼度类科仪以救拔九幽为务。",
+      "seedEdges": [{ "to": "liandu", "type": "related_to" }]
+    },
+    {
+      "id": "dongtian",
+      "type": "concept",
+      "label": "洞天福地",
+      "aliases": ["洞天福地", "洞天", "福地", "三十六洞天"],
+      "shortDef": "道教认定的神圣山川洞府体系，既是修行胜境，也是地理与神话交织的空间秩序。"
+    },
+    {
+      "id": "zhaijiao",
+      "type": "ritual",
+      "label": "齋醮",
+      "aliases": ["齋醮", "斋醮", "齋法", "醮儀", "醮事"],
+      "shortDef": "道教两大类公共仪式的合称。斋重洁己悔过，醮重设供祈禳，后世多合并举行。",
+      "seedEdges": [
+        { "to": "jiaotan", "type": "related_to" },
+        { "to": "lingbao", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "dengyi",
+      "type": "ritual",
+      "label": "燈儀",
+      "aliases": ["燈儀", "灯仪", "然燈", "放燈", "燃燈"],
+      "shortDef": "以点灯为核心的仪式，取灯明破暗之象，用于延寿、破狱、济幽。"
+    },
+    {
+      "id": "chanfa",
+      "type": "ritual",
+      "label": "懺法",
+      "aliases": ["懺法", "忏法", "懺儀", "禮懺", "悔過"],
+      "shortDef": "陈罪悔过、请求宽宥的仪式文本类型，篇制常按神位次第排列。"
+    },
+    {
+      "id": "liandu",
+      "type": "ritual",
+      "label": "煉度",
+      "aliases": ["煉度", "炼度", "度亡", "濟度", "拔度"],
+      "shortDef": "以水火交炼超度亡魂、使其更生的仪式，宋以后灵宝一系发展尤备。"
+    },
+    {
+      "id": "shoulu",
+      "type": "ritual",
+      "label": "授籙",
+      "aliases": ["授籙", "授箓", "傳度", "受籙", "盟威"],
+      "shortDef": "将法籙授予受度者的传度仪式，确立其道阶与行法资格。",
+      "seedEdges": [{ "to": "zhengyi", "type": "related_to" }]
+    },
+    {
+      "id": "duren",
+      "type": "ritual",
+      "label": "度人",
+      "aliases": ["度人", "普度", "齊同慈愛", "無量度人"],
+      "shortDef": "灵宝一系强调的普度众生的宗旨与相应仪式，以《度人经》为宗本。",
+      "seedEdges": [{ "to": "lingbao", "type": "related_to" }]
+    },
+    {
+      "id": "chaozhen",
+      "type": "ritual",
+      "label": "朝真",
+      "aliases": ["朝真", "朝儀", "行道", "宿啟", "散壇"],
+      "shortDef": "斋醮程式中朝谒神真的环节，含宿启、行道、散坛等次第。"
+    },
+    {
+      "id": "toulong",
+      "type": "ritual",
+      "label": "投龍",
+      "aliases": ["投龍", "投龙", "投簡", "沉簡"],
+      "shortDef": "将金龙玉简投于名山水府以告盟天地的仪式，唐宋帝王多行之。"
+    },
+    {
+      "id": "huanglu",
+      "type": "ritual",
+      "label": "黃籙齋",
+      "aliases": ["黃籙齋", "黄箓斋", "黃籙", "金籙齋", "玉籙齋"],
+      "shortDef": "按用途分级的斋法名目：金箓多为国事，玉箓为士庶祈禳，黄箓主拔度亡魂。"
+    },
+    {
+      "id": "zhengyi",
+      "type": "sect",
+      "label": "正一",
+      "aliases": ["正一", "正壹", "天師道", "五斗米道"],
+      "shortDef": "以张道陵所传盟威之道为宗的道派，重符籙、章奏与授度制度，元以后统领江南符箓诸派。",
+      "seedEdges": [
+        { "to": "zhangdaoling", "type": "related_to" },
+        { "to": "longhushan", "type": "related_to" },
+        { "to": "fulu", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "shangqing",
+      "type": "sect",
+      "label": "上清",
+      "aliases": ["上清", "上清派", "茅山宗"],
+      "shortDef": "以《上清经》为宗的道派，重存思内景与身中神真，唐代最盛，以茅山为中心。",
+      "seedEdges": [
+        { "to": "weihuacun", "type": "related_to" },
+        { "to": "maoshan", "type": "related_to" },
+        { "to": "cunsi", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "lingbao",
+      "type": "sect",
+      "label": "靈寶",
+      "aliases": ["靈寶", "灵宝", "靈寶派", "閣皂"],
+      "shortDef": "以《灵宝经》为宗的道派，重斋醮科仪与普度济幽，对后世仪式传统影响最深。",
+      "seedEdges": [
+        { "to": "luxiujing", "type": "related_to" },
+        { "to": "zhaijiao", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "quanzhen",
+      "type": "sect",
+      "label": "全真",
+      "aliases": ["全真", "全真道", "重陽", "龍門"],
+      "shortDef": "金元之际王重阳所创道派，主性命双修、三教融通与出家清修，元以后与正一分领南北。",
+      "seedEdges": [
+        { "to": "wangchongyang", "type": "related_to" },
+        { "to": "neidan", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "shenxiao",
+      "type": "sect",
+      "label": "神霄",
+      "aliases": ["神霄", "神霄派", "高上神霄"],
+      "shortDef": "北宋末兴起、以神霄雷法为特色的道派，与徽宗朝道教政策关系密切。"
+    },
+    {
+      "id": "qingwei",
+      "type": "sect",
+      "label": "清微",
+      "aliases": ["清微", "清微派"],
+      "shortDef": "元代形成的符箓道派，融摄上清、灵宝与雷法诸家法门。"
+    },
+    {
+      "id": "jingming",
+      "type": "sect",
+      "label": "淨明",
+      "aliases": ["淨明", "净明", "淨明道", "忠孝"],
+      "shortDef": "宋元之际以许逊信仰为中心的道派，标举忠孝净明为修行纲宗。"
+    },
+    {
+      "id": "taipingdao",
+      "type": "sect",
+      "label": "太平道",
+      "aliases": ["太平道", "太平經法", "黃巾"],
+      "shortDef": "东汉末以《太平经》为号召的早期道教运动，与太平部文献渊源相关。"
+    },
+    {
+      "id": "yuanshi",
+      "type": "deity",
+      "label": "元始天尊",
+      "aliases": ["元始天尊", "元始", "天寶君"],
+      "shortDef": "三清之首，多为经文开篇说法之主，象征道体的最初显现。"
+    },
+    {
+      "id": "laojun",
+      "type": "deity",
+      "label": "太上老君",
+      "aliases": ["太上老君", "老君", "道德天尊", "太清道德"],
+      "shortDef": "老子的神格化身，为道教教主级神明，亦是众多经诰的传授者。",
+      "seedEdges": [{ "to": "laozi", "type": "related_to" }]
+    },
+    {
+      "id": "lingbaotianzun",
+      "type": "deity",
+      "label": "靈寶天尊",
+      "aliases": ["靈寶天尊", "太上道君", "上清大帝"],
+      "shortDef": "三清之一，灵宝经系中的说法之主。"
+    },
+    {
+      "id": "yuhuang",
+      "type": "deity",
+      "label": "玉皇",
+      "aliases": ["玉皇", "玉帝", "昊天", "玉皇大帝"],
+      "shortDef": "统御三界的至上帝君，宋代以后地位极隆，为章奏文书的主要奏告对象。"
+    },
+    {
+      "id": "zhenwu",
+      "type": "deity",
+      "label": "真武",
+      "aliases": ["真武", "玄武", "玄天上帝", "蕩魔天尊"],
+      "shortDef": "北方之神，主镇邪除魔，明代因皇室崇奉而信仰极盛，以武当山为祖庭。",
+      "seedEdges": [{ "to": "wudangshan", "type": "related_to" }]
+    },
+    {
+      "id": "doumu",
+      "type": "deity",
+      "label": "斗姆",
+      "aliases": ["斗姆", "斗母", "先天斗姆", "摩利支"],
+      "shortDef": "北斗众星之母，主司星命与延寿，相关灯仪、忏法文献甚多。"
+    },
+    {
+      "id": "sanguan",
+      "type": "deity",
+      "label": "三官",
+      "aliases": ["三官", "三元", "三官大帝", "天地水官"],
+      "shortDef": "天官、地官、水官，分司赐福、赦罪、解厄，与三元日节令相配。"
+    },
+    {
+      "id": "taiyi",
+      "type": "deity",
+      "label": "太乙救苦天尊",
+      "aliases": ["太乙救苦天尊", "太一救苦", "救苦天尊", "青華"],
+      "shortDef": "主救度苦难与幽冥拔济的神明，炼度类科仪常以之为主尊。"
+    },
+    {
+      "id": "leizun",
+      "type": "deity",
+      "label": "雷聲普化天尊",
+      "aliases": ["雷聲普化天尊", "普化天尊", "雷祖", "九天應元"],
+      "shortDef": "雷部至尊，统摄雷霆诸将，为雷法系统的核心神明。",
+      "seedEdges": [{ "to": "leifa", "type": "related_to" }]
+    },
+    {
+      "id": "xuannv",
+      "type": "deity",
+      "label": "九天玄女",
+      "aliases": ["九天玄女", "玄女"],
+      "shortDef": "传授兵法与秘术的女仙，见于多种法术与兵阴阳文献。"
+    },
+    {
+      "id": "xiwangmu",
+      "type": "deity",
+      "label": "西王母",
+      "aliases": ["西王母", "王母", "金母", "龜臺"],
+      "shortDef": "掌不死之药与仙籍的女神，早期仙话与上清传记的重要人物。"
+    },
+    {
+      "id": "dongyue",
+      "type": "deity",
+      "label": "東嶽大帝",
+      "aliases": ["東嶽大帝", "東嶽", "泰山府君"],
+      "shortDef": "泰山之神，主生死簿籍，与冥司信仰关系密切。"
+    },
+    {
+      "id": "wenchang",
+      "type": "deity",
+      "label": "文昌",
+      "aliases": ["文昌", "文昌帝君", "梓潼"],
+      "shortDef": "主文运科第的神明，相关阴骘、劝善文献流传甚广。"
+    },
+    {
+      "id": "laozi",
+      "type": "person",
+      "label": "老子",
+      "aliases": ["老子", "李耳", "老聃"],
+      "shortDef": "《道德经》传统所归之作者，道家思想的奠基者，后被神格化为太上老君。"
+    },
+    {
+      "id": "zhuangzi",
+      "type": "person",
+      "label": "莊子",
+      "aliases": ["莊子", "庄子", "莊周", "南華"],
+      "shortDef": "战国道家代表，《庄子》一书对道教心性与逍遥之说影响深远。"
+    },
+    {
+      "id": "zhangdaoling",
+      "type": "person",
+      "label": "張道陵",
+      "aliases": ["張道陵", "張陵", "張天師", "祖天師"],
+      "shortDef": "东汉末创立盟威之道者，正一派奉为祖师，后世天师世系皆溯于此。"
+    },
+    {
+      "id": "gehong",
+      "type": "person",
+      "label": "葛洪",
+      "aliases": ["葛洪", "抱朴子", "稚川"],
+      "shortDef": "东晋道教学者，《抱朴子》系统整理神仙、金丹与方术之说。"
+    },
+    {
+      "id": "taohongjing",
+      "type": "person",
+      "label": "陶弘景",
+      "aliases": ["陶弘景", "華陽隱居", "貞白"],
+      "shortDef": "南朝上清宗师，编《真诰》、定神谱，奠定茅山传统。",
+      "seedEdges": [{ "to": "maoshan", "type": "related_to" }]
+    },
+    {
+      "id": "luxiujing",
+      "type": "person",
+      "label": "陸修靜",
+      "aliases": ["陸修靜", "陆修静", "簡寂"],
+      "shortDef": "南朝道教改革者，整理灵宝经教、创制斋仪，并首倡三洞分部的经目体系。"
+    },
+    {
+      "id": "koqianzhi",
+      "type": "person",
+      "label": "寇謙之",
+      "aliases": ["寇謙之", "寇谦之"],
+      "shortDef": "北魏道士，推行清整道教并获国家崇奉，史称北天师道。"
+    },
+    {
+      "id": "weihuacun",
+      "type": "person",
+      "label": "魏華存",
+      "aliases": ["魏華存", "魏夫人", "南嶽夫人", "紫虛元君"],
+      "shortDef": "上清经系奉为传经始祖的女仙，世称南岳魏夫人。"
+    },
+    {
+      "id": "simachengzhen",
+      "type": "person",
+      "label": "司馬承禎",
+      "aliases": ["司馬承禎", "司马承祯", "白雲子", "天台白雲"],
+      "shortDef": "唐代上清宗师，《坐忘论》《天隐子》一系静定修养文献与其相关。"
+    },
+    {
+      "id": "duguangting",
+      "type": "person",
+      "label": "杜光庭",
+      "aliases": ["杜光庭", "廣成先生"],
+      "shortDef": "唐末五代道门学者，整理科仪与经义，著述宏富。"
+    },
+    {
+      "id": "weiboyang",
+      "type": "person",
+      "label": "魏伯陽",
+      "aliases": ["魏伯陽", "魏伯阳"],
+      "shortDef": "传为《周易参同契》作者，丹道以之为「万古丹经王」之祖。"
+    },
+    {
+      "id": "zhangboduan",
+      "type": "person",
+      "label": "張伯端",
+      "aliases": ["張伯端", "张伯端", "紫陽真人", "悟真"],
+      "shortDef": "北宋内丹家，《悟真篇》为南宗丹法宗本。",
+      "seedEdges": [{ "to": "neidan", "type": "related_to" }]
+    },
+    {
+      "id": "baiyuchan",
+      "type": "person",
+      "label": "白玉蟾",
+      "aliases": ["白玉蟾", "海瓊", "紫清"],
+      "shortDef": "南宋道士，金丹南宗集大成者，兼擅雷法与文辞。"
+    },
+    {
+      "id": "wangchongyang",
+      "type": "person",
+      "label": "王重陽",
+      "aliases": ["王重陽", "王重阳", "重陽真人", "王嚞"],
+      "shortDef": "全真道创立者，主张三教合一与性命双修。"
+    },
+    {
+      "id": "qiuchuji",
+      "type": "person",
+      "label": "丘處機",
+      "aliases": ["丘處機", "丘处机", "長春真人"],
+      "shortDef": "全真七子之一，元初主领道教，全真由此大盛。"
+    },
+    {
+      "id": "ludongbin",
+      "type": "person",
+      "label": "呂洞賓",
+      "aliases": ["呂洞賓", "吕洞宾", "純陽", "呂祖"],
+      "shortDef": "唐代传说仙人，宋以后成为丹道与民间信仰的核心人物，托名文献极多。"
+    },
+    {
+      "id": "zhongliquan",
+      "type": "person",
+      "label": "鍾離權",
+      "aliases": ["鍾離權", "钟离权", "正陽", "漢鍾離"],
+      "shortDef": "传说仙人，与吕洞宾并称，钟吕一系丹法托名于此。"
+    },
+    {
+      "id": "lidaochun",
+      "type": "person",
+      "label": "李道純",
+      "aliases": ["李道純", "李道纯", "清庵瑩蟾"],
+      "shortDef": "元代丹家，融通南北宗，以中和之说论丹道。"
+    },
+    {
+      "id": "zhangsanfeng",
+      "type": "person",
+      "label": "張三豐",
+      "aliases": ["張三豐", "张三丰", "三豐"],
+      "shortDef": "元明之际传说道士，后世众多内丹与武学文献托其名。"
+    },
+    {
+      "id": "longhushan",
+      "type": "place",
+      "label": "龍虎山",
+      "aliases": ["龍虎山", "龙虎山", "龍虎宗壇"],
+      "shortDef": "江西名山，正一派天师世居之地，符箓传度的中心。"
+    },
+    {
+      "id": "maoshan",
+      "type": "place",
+      "label": "茅山",
+      "aliases": ["茅山", "句曲", "華陽洞"],
+      "shortDef": "江苏名山，上清派祖庭，历代宗师传经之所。"
+    },
+    {
+      "id": "wudangshan",
+      "type": "place",
+      "label": "武當山",
+      "aliases": ["武當山", "武当山", "武當", "太和山"],
+      "shortDef": "湖北名山，真武信仰中心，明代皇室大加营建。"
+    },
+    {
+      "id": "qingchengshan",
+      "type": "place",
+      "label": "青城山",
+      "aliases": ["青城山", "青城"],
+      "shortDef": "四川名山，早期天师道传教要地，为道教十大洞天之一。"
+    },
+    {
+      "id": "zhongnanshan",
+      "type": "place",
+      "label": "終南山",
+      "aliases": ["終南山", "终南山", "終南", "樓觀"],
+      "shortDef": "陕西名山，楼观一系与关中道教传统的核心区域。"
+    },
+    {
+      "id": "luofushan",
+      "type": "place",
+      "label": "羅浮山",
+      "aliases": ["羅浮山", "罗浮山", "羅浮"],
+      "shortDef": "广东名山，葛洪炼丹传说所系，岭南道教重镇。"
+    },
+    {
+      "id": "tiantaishan",
+      "type": "place",
+      "label": "天台山",
+      "aliases": ["天台山", "赤城"],
+      "shortDef": "浙江名山，道释交汇之地，多位唐代道门人物栖隐于此。"
+    },
+    {
+      "id": "kunlun",
+      "type": "place",
+      "label": "崑崙",
+      "aliases": ["崑崙", "崑崘", "昆崙", "昆仑"],
+      "shortDef": "神话中的西方仙山，西王母所居，仙境地理的原型之一。"
+    },
+    {
+      "id": "taishan",
+      "type": "place",
+      "label": "泰山",
+      "aliases": ["泰山", "岱嶽", "東嶽山"],
+      "shortDef": "五岳之东岳，封禅与冥司信仰的重心。"
+    }
+  ]
+}

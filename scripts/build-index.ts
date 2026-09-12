@@ -1,6 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
+import { splitTitleAndAttribution } from '../lib/author';
 
 const DATA_DIR = path.resolve(__dirname, '../data/daozang-text');
 
@@ -19,32 +20,32 @@ interface DaozangEntry {
 
 function parseFilename(filename: string): Partial<DaozangEntry> {
   const name = filename.replace(/\.txt$/, '');
-  
+
   let m = name.match(/^正[統统]道藏(洞[真玄神]部|太平部|太清部|太玄部|正一部)([\u4e00-\u9fff]+類)?-(.+)$/);
   if (m) {
-    const remainder = m[3];
-    const am = remainder.match(/^(.+?)-([南北朝宋元明清隋唐五代晉漢秦戰國周商夏])[-\u4e00-\u9fff]{1,8}$/);
+    // 题署从书名尾巴切，不再用单字朝代类去拼 author（那会写出 宋-宋-王慶升）
+    const { title, author } = splitTitleAndAttribution(m[3]);
     return {
       collection: '正统道藏',
       category: m[1],
       subcategory: m[2] || '',
-      title: am ? am[1] : remainder,
-      author: am ? `${am[2]}-${remainder.slice(am[1].length + 1)}` : undefined,
+      title,
+      author,
     };
   }
-  
+
   m = name.match(/^續[续]道藏-(.+)$/);
   if (m) {
-    const am = m[1].match(/^(.+?)-([南北朝宋元明清隋唐五代晉漢秦戰國周商夏])[-\u4e00-\u9fff]{1,8}$/);
+    const { title, author } = splitTitleAndAttribution(m[1]);
     return {
       collection: '续道藏',
       category: '续道藏',
       subcategory: '',
-      title: am ? am[1] : m[1],
-      author: am ? `${am[2]}-${m[1].slice(am[1].length + 1)}` : undefined,
+      title,
+      author,
     };
   }
-  
+
   return { title: name, collection: '其他', category: '其他', subcategory: '' };
 }
 

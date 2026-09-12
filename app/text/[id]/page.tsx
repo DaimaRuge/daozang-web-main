@@ -6,6 +6,7 @@ import { parseText } from '@/lib/text-parser';
 import { applyOverrides } from '@/lib/parser-overrides';
 import { injectRitualIllustrations } from '@/lib/ritual-illustrations';
 import Reader from '@/components/reader/Reader';
+import WorkRelations from '@/components/graph/WorkRelations';
 
 /**
  * 阅读页（服务端组件）。
@@ -40,7 +41,7 @@ export default async function TextPage({ params }: PageProps) {
   const entry = getEntryById(id);
   if (!entry) notFound();
 
-  const content = getContentById(id);
+  const content = await getContentById(id);
   // 规则解析 → 人工校正 → 科仪示意图注入（均在服务端完成，正文 SSR 可读）
   const parsed = injectRitualIllustrations(
     applyOverrides(parseText(content, id, entry.title)),
@@ -48,14 +49,18 @@ export default async function TextPage({ params }: PageProps) {
   const { prev, next } = getAdjacentEntries(id);
 
   return (
-    <Suspense fallback={<p className="text-sm text-[var(--muted)] py-12 text-center">加载阅读器…</p>}>
-      <Reader
-        key={id}
-        entry={entry}
-        parsed={parsed}
-        prev={prev ? { id: prev.id, title: prev.title } : null}
-        next={next ? { id: next.id, title: next.title } : null}
-      />
-    </Suspense>
+    <>
+      <Suspense fallback={<p className="text-sm text-[var(--muted)] py-12 text-center">加载阅读器…</p>}>
+        <Reader
+          key={id}
+          entry={entry}
+          parsed={parsed}
+          prev={prev ? { id: prev.id, title: prev.title } : null}
+          next={next ? { id: next.id, title: next.title } : null}
+        />
+      </Suspense>
+      {/* 关联区块在阅读器之外渲染：服务端只读产物，链接对搜索引擎可见 */}
+      <WorkRelations bookId={id} title={entry.title} />
+    </>
   );
 }

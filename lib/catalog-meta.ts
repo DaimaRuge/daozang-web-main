@@ -150,6 +150,14 @@ export const EXPLORE_PATHS: ExplorePath[] = [
     icon: '符',
   },
   {
+    id: 'graph',
+    title: '关联图谱',
+    description: '从一个概念出发，看它牵连的宗派、人物与典籍',
+    tags: [],
+    href: '/graph?id=concept%3Afulu',
+    icon: '關',
+  },
+  {
     id: 'short',
     title: '短篇速览',
     description: '百行以内，适合碎片时间通读',

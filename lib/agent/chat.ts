@@ -6,15 +6,24 @@
  * 这是 Agent Runtime 的雏形，未来的推荐、笔记整理等 Agent 复用同一套
  * 组装逻辑；API 路由只负责 HTTP 编解码。
  *
- * 检索增强（v1，轻量）：从用户问题中提取书名号内的典籍名做检索，
- * 命中的原文片段作为参考资料注入提示词，让回答有据可引。
+ * 检索增强：书名号 → 目录检索；问句概念 → 词表最长匹配（图谱 lexicon）
+ * 再以停用词切分补位。命中实体时用提及边的 blockId 引文，否则全文检索。
  * 未做向量检索 —— 属路线图中期项，接口不变时可无缝升级。
  */
 
 import { AgentContext, AgentMessage, Citation } from './context';
+import { extractConcepts } from './concepts';
 import { getProvider } from './provider';
 import { searchEntries } from '@/lib/data';
 import { searchFullText } from '@/lib/fulltext-search';
+import {
+  getConceptLexicon,
+  mentionCitationsForQuery,
+  resolveQuery,
+} from '@/lib/graph/query';
+import { queryVariants } from '@/lib/zh-convert';
+
+export { extractConcepts } from './concepts';
 
 /** 问答系统提示词：学术严谨性约束在此固化 */
 const CHAT_SYSTEM_PROMPT = [
@@ -40,38 +49,8 @@ function extractBookTitles(question: string): string[] {
   return Array.from(question.matchAll(/《([^》]{1,20})》/g)).map(m => m[1]);
 }
 
-/**
- * 疑问/功能性词汇：从问题中剔除后剩下的片段即概念候选词。
- * 用「剔除停用词 + 标点切分」而非分词器：确定性、零依赖，
- * 对「什么是清静无为」「内丹和外丹有什么区别」这类问句足够有效。
- */
-// 注意：正则交替从左到右取首个匹配，长短语必须排在其包含的短词之前
-// （如「有什么」在「什么」之前），否则会留下残字黏在概念词上
-const STOPWORDS_RE = new RegExp(
-  [
-    '有什么', '是什么', '什么是', '什么叫', '为什么', '什么样', '什么',
-    '怎么样', '怎么', '如何', '为何', '是不是', '有没有', '有哪些',
-    '哪些', '哪个', '哪里', '谁是', '多少',
-    '请问', '请解释', '解释一下', '介绍一下', '讲讲', '说说', '告诉我',
-    '的意思', '的含义', '意思', '含义', '区别', '关系', '异同',
-    '是', '的', '和', '与', '或', '了', '吗', '呢', '啊', '这', '那', '它', '一下',
-  ].join('|'),
-  'g',
-);
-
-/** 概念候选词提取：去书名号内容 → 剔除停用词 → 按标点切分 → 取 2~8 字片段（导出供测试） */
-export function extractConcepts(question: string): string[] {
-  const withoutTitles = question.replace(/《[^》]*》/g, '，');
-  const cleaned = withoutTitles.replace(STOPWORDS_RE, '，');
-  const candidates = cleaned
-    .split(/[，。？！、；：\s「」『』（）()？?!.,]+/)
-    .map(s => s.trim())
-    .filter(s => /^[\u3400-\u9fff]{2,8}$/.test(s));
-  return Array.from(new Set(candidates)).slice(0, 3);
-}
-
 /** 组装参考资料：书名 + 概念级检索 + 阅读上下文，返回资料文本与引用列表 */
-function buildReferences(question: string, context: AgentContext): { text: string; citations: Citation[] } {
+async function buildReferences(question: string, context: AgentContext): Promise<{ text: string; citations: Citation[] }> {
   const citations: Citation[] = [];
   const parts: string[] = [];
   const citedBooks = new Set<string>();
@@ -82,21 +61,43 @@ function buildReferences(question: string, context: AgentContext): { text: strin
     const book = results[0];
     if (!book || citedBooks.has(book.id)) continue;
     citedBooks.add(book.id);
-    const { results: hits } = searchFullText(title.length >= 2 ? title : book.title, 1, 1);
+    const { results: hits } = await searchFullText(title.length >= 2 ? title : book.title, 1, 1);
     const snippet = hits.find(h => h.entry.id === book.id)?.snippet ?? book.preview.slice(0, 150);
     parts.push(`《${book.title}》（${book.collection} · ${book.category}）片段：${snippet}`);
     citations.push({ bookId: book.id, bookTitle: book.title, quote: snippet.slice(0, 100) });
   }
 
-  // 2. 概念级检索：候选概念词做全文检索（简繁变体已在检索层处理），
-  //    每个概念取命中最多的前 2 部典籍片段作为参考
-  for (const concept of extractConcepts(question)) {
-    const { results: hits } = searchFullText(concept, 1, 2);
-    for (const hit of hits) {
-      if (citedBooks.has(hit.entry.id)) continue;
-      citedBooks.add(hit.entry.id);
-      parts.push(`《${hit.entry.title}》中与「${concept}」相关的片段：${hit.snippet}`);
-      citations.push({ bookId: hit.entry.id, bookTitle: hit.entry.title, quote: hit.snippet.slice(0, 100) });
+  // 2. 概念级检索：词表最长匹配 + 停用词补位。
+  //    能解析到图谱实体时，直接用构建期扫好的提及出处（带 blockId）；
+  //    未入词表的片段仍走全文检索。
+  const concepts = extractConcepts(question, {
+    lexicon: getConceptLexicon(),
+    variants: queryVariants,
+    canonicalId: term => resolveQuery(term)?.id,
+  });
+  for (const concept of concepts) {
+    const graphHits = mentionCitationsForQuery(concept, 2);
+    if (graphHits.length > 0) {
+      for (const hit of graphHits) {
+        if (citedBooks.has(hit.bookId)) continue;
+        citedBooks.add(hit.bookId);
+        const snippet = hit.quote ?? '';
+        parts.push(`《${hit.bookTitle}》中与「${concept}」相关的片段：${snippet}`);
+        citations.push({
+          bookId: hit.bookId,
+          bookTitle: hit.bookTitle,
+          blockId: hit.blockId,
+          quote: snippet.slice(0, 100),
+        });
+      }
+    } else {
+      const { results: hits } = await searchFullText(concept, 1, 2);
+      for (const hit of hits) {
+        if (citedBooks.has(hit.entry.id)) continue;
+        citedBooks.add(hit.entry.id);
+        parts.push(`《${hit.entry.title}》中与「${concept}」相关的片段：${hit.snippet}`);
+        citations.push({ bookId: hit.entry.id, bookTitle: hit.entry.title, quote: hit.snippet.slice(0, 100) });
+      }
     }
     if (citedBooks.size >= 5) break; // 参考资料上限，控制提示词长度
   }
@@ -121,7 +122,7 @@ export async function runChat(context: AgentContext): Promise<ChatResult> {
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
   if (!lastUser) throw new Error('对话中缺少用户消息');
 
-  const { text: references, citations } = buildReferences(lastUser.content, context);
+  const { text: references, citations } = await buildReferences(lastUser.content, context);
 
   const finalMessages: AgentMessage[] = [
     { role: 'system', content: CHAT_SYSTEM_PROMPT + (references ? `\n\n参考资料：\n${references}` : '') },
@@ -142,7 +143,7 @@ export async function* runChatStream(
   const lastUser = [...messages].reverse().find(m => m.role === 'user');
   if (!lastUser) throw new Error('对话中缺少用户消息');
 
-  const { text: references, citations } = buildReferences(lastUser.content, context);
+  const { text: references, citations } = await buildReferences(lastUser.content, context);
   const finalMessages: AgentMessage[] = [
     { role: 'system', content: CHAT_SYSTEM_PROMPT + (references ? `\n\n参考资料：\n${references}` : '') },
     ...messages.slice(-10).map(m => ({ role: m.role, content: m.content })),

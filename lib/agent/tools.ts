@@ -15,6 +15,12 @@
 import { getIndex, getEntryById, searchEntries, getContentById } from '@/lib/data';
 import { searchFullText } from '@/lib/fulltext-search';
 import { parseText } from '@/lib/text-parser';
+import {
+  graphForWork,
+  graphViewForQuery,
+  isGraphAvailable,
+  summarizeView,
+} from '@/lib/graph/query';
 import { AgentContext, PermissionContext } from './context';
 import { getProvider } from './provider';
 
@@ -87,7 +93,7 @@ registerTool({
   requires: null,
   validate: input => (typeof input.query === 'string' && input.query.trim() ? null : 'query 必填'),
   async execute(input) {
-    const { results, total } = searchFullText(String(input.query), 1, 10);
+    const { results, total } = await searchFullText(String(input.query), 1, 10);
     return { total, hits: results };
   },
 });
@@ -113,7 +119,7 @@ registerTool({
     const bookId = String(input.bookId);
     const entry = getEntryById(bookId);
     if (!entry) throw new Error('典籍不存在');
-    const content = getContentById(bookId);
+    const content = await getContentById(bookId);
     const parsed = parseText(content, bookId, entry.title);
     // 输出给模型时截断，避免整本书塞进上下文
     return { toc: parsed.toc, blocks: parsed.blocks.slice(0, 200) };
@@ -142,6 +148,33 @@ registerTool({
       .entries.filter(e => e.category === entry.category && e.id !== entry.id)
       .slice(0, 10)
       .map(e => ({ id: e.id, title: e.title, author: e.author }));
+  },
+});
+
+registerTool({
+  name: 'find_related_concepts',
+  description:
+    '基于知识图谱查找某个概念、宗派、人物、科仪或典籍的关联本体与关联文献，返回关系类型、来源与原文出处',
+  requires: null,
+  validate: input => {
+    const hasQuery = typeof input.query === 'string' && input.query.trim();
+    const hasBook = typeof input.bookId === 'string' && input.bookId.trim();
+    if (!hasQuery && !hasBook) return 'query 或 bookId 至少提供一个';
+    if (hasQuery && String(input.query).length > 40) return 'query 过长（上限 40 字）';
+    return null;
+  },
+  async execute(input) {
+    if (!isGraphAvailable()) throw new Error('知识图谱数据尚未构建');
+
+    const view =
+      typeof input.bookId === 'string' && input.bookId.trim()
+        ? graphForWork(String(input.bookId).trim())
+        : graphViewForQuery(String(input.query).trim());
+
+    if (!view) throw new Error('未找到相关本体');
+
+    // 压成精简结构：模型只需要关系与出处，不需要坐标与完整节点属性
+    return summarizeView(view);
   },
 });
 
@@ -266,7 +299,7 @@ registerTool({
     const bookTitle = context.reading?.bookTitle ?? '未知典籍';
     let source = typeof input.text === 'string' ? input.text.trim() : '';
     if (!source && typeof input.bookId === 'string') {
-      const content = getContentById(String(input.bookId));
+      const content = await getContentById(String(input.bookId));
       // 无划定文本时取开篇片段，避免整书塞进上下文
       source = content.slice(0, 3000);
     }
@@ -294,7 +327,6 @@ registerTool({
 
 const PLANNED_TOOLS: Array<{ name: string; description: string; requires: keyof PermissionContext | null }> = [
   { name: 'compare_passages', description: '对比多个经文段落的异同（依赖模型供应商）', requires: 'canUseAI' },
-  { name: 'find_related_concepts', description: '查找相关概念（依赖知识图谱，规划中）', requires: null },
   { name: 'create_note', description: '为用户创建笔记（依赖用户数据同步服务）', requires: 'canWriteUserData' },
   { name: 'update_note', description: '更新用户笔记', requires: 'canWriteUserData' },
   { name: 'save_bookmark', description: '为用户保存收藏', requires: 'canWriteUserData' },

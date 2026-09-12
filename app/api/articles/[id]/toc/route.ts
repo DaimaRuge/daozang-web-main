@@ -9,10 +9,10 @@ interface RouteParams {
 /** PRD §5：目录树，每项含 pageId（1-based 页码） */
 export async function GET(_req: Request, { params }: RouteParams) {
   const { id } = await params;
-  const parsed = loadParsedBook(id);
+  const parsed = await loadParsedBook(id);
   if (!parsed) return NextResponse.json({ error: 'not found' }, { status: 404 });
 
-  const toc = getEnrichedToc(id);
+  const toc = await getEnrichedToc(id);
   const totalPages = paginateBlocks(parsed.blocks).length;
 
   return NextResponse.json({

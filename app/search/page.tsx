@@ -2,11 +2,17 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { searchEntries } from '@/lib/data';
 import { searchFullText } from '@/lib/fulltext-search';
+import { graphViewForQuery, isGraphAvailable } from '@/lib/graph/query';
+import GraphPanel from '@/components/graph/GraphPanel';
 
 /**
  * 搜索页（服务端组件）。
  * 两种模式：书名搜索（标题/作者/预览，默认）与全文搜索（正文命中 + 上下文摘要）。
  * 模式通过 URL 参数切换，保证搜索结果可分享、可收藏、可被搜索引擎索引。
+ *
+ * 检索词若能在知识图谱中定位（或经命中典籍反向汇总出关系），
+ * 结果之上会多出一个「关联图谱」折叠面板 —— 让用户除了拿到匹配结果，
+ * 还能看见这个词牵连着哪些本体、宗派、科仪与其他文献。
  */
 
 interface PageProps {
@@ -39,9 +45,12 @@ export default async function SearchPage({ searchParams }: PageProps) {
   const pageSize = 20;
 
   const meta = mode === 'meta' && query ? searchEntries(query, page, pageSize) : { results: [], total: 0 };
-  const full = mode === 'full' && query ? searchFullText(query, page, pageSize) : { results: [], total: 0 };
+  const full = mode === 'full' && query ? await searchFullText(query, page, pageSize) : { results: [], total: 0 };
   const total = mode === 'full' ? full.total : meta.total;
   const totalPages = Math.ceil(total / pageSize);
+
+  // 图谱只在首页结果上出现：翻到第二页的用户已在逐条读结果，不该被再次打断
+  const graphView = query && page === 1 && isGraphAvailable() ? graphViewForQuery(query) : null;
 
   const pageHref = (p: number) =>
     `?q=${encodeURIComponent(query)}&mode=${mode}&page=${p}`;
@@ -112,6 +121,8 @@ export default async function SearchPage({ searchParams }: PageProps) {
           {mode === 'full' ? '全文' : '书名'}搜索「{query}」，找到 {total} {mode === 'full' ? '部含此内容的典籍' : '条结果'}
         </p>
       )}
+
+      {graphView && <GraphPanel view={graphView} />}
 
       {/* 书名搜索结果 */}
       {mode === 'meta' && meta.results.length > 0 && (
