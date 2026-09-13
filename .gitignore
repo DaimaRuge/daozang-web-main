@@ -12,6 +12,7 @@ data/index.json
 data/content.json
 data/daozang.db
 data/daozang.db-*
+# 本机工作副本（含 20GB 高清复原）。网页用原扫描已入库 public/daozang-images/
 data/images-daozang/
 data/images-daozang-meta/
 data/daozang-tiny-skips.json

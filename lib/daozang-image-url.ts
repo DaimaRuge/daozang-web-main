@@ -2,14 +2,16 @@
  * 原书插图 URL 与文件名辅助（可进客户端）。
  * 磁盘路径与索引加载仍只在 lib/daozang-images.ts。
  *
- * 阅读块仍写站内 /api/daozang-images/...，方便校定解析；
- * 对象存储 key 固定为 daozang-images/<部>/<文件>，Vercel 上 API 再 302 到 CDN。
+ * 原扫描 jpg 已入库 public/daozang-images/，阅读页走静态路径；
+ * 复原色（png/webp）仍走 /api/daozang-images/...，本机读盘或 302 到 CDN。
  */
 
 export const DAOZANG_OBJECT_PREFIX = 'daozang-images';
 
 export function daozangImageUrl(part: string, file: string): string {
-  return `/api/daozang-images/${encodeURIComponent(part)}/${encodeURIComponent(file)}`;
+  const encoded = `${encodeURIComponent(part)}/${encodeURIComponent(file)}`;
+  if (/\.(jpe?g)$/i.test(file)) return `/daozang-images/${encoded}`;
+  return `/api/daozang-images/${encoded}`;
 }
 
 /** 桶内稳定 key，重跑上传可覆盖同一对象 */

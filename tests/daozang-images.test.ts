@@ -153,7 +153,7 @@ describe('injectDaozangImages', () => {
     assert.ok(image);
     assert.ok(caption);
     assert.equal(image?.parser, 'daozang-scan');
-    assert.match(image?.content ?? '', /\/api\/daozang-images\//);
+    assert.match(image?.content ?? '', /\/daozang-images\//);
     assert.match(caption?.content ?? '', /原书插图/);
     assert.equal(caption?.parser, 'daozang-scan');
     assert.deepEqual(
