@@ -38,6 +38,7 @@ import { getEntryTags } from '../lib/entry-tags';
 import type { DaozangEntry } from '../lib/data';
 import { formatAuthor, parseAuthor } from '../lib/author';
 import { MAX_AUTO_TERMS, pickAutoTerms } from '../lib/graph/auto-merge';
+import { pickTaxonomyLinks } from '../lib/graph/taxonomy';
 
 const ROOT = path.resolve(__dirname, '..');
 const INDEX_PATH = path.join(ROOT, 'public/data/index.json');
@@ -261,8 +262,30 @@ function main(): void {
       autoEntityIds.add(id);
       autoMerged++;
     }
+    const curatedParents = gazetteer.entries.map(g => ({
+      id: nodeId(g.type, g.id),
+      type: g.type,
+      label: g.label,
+    }));
+    const autoIdByTerm = new Map(picked.map(t => [t.term, nodeId(t.type, `auto-${t.term}`)]));
+    const taxoLinks = pickTaxonomyLinks(
+      picked.map(t => ({ term: t.term, type: t.type })),
+      curatedParents,
+    );
+    for (const link of taxoLinks) {
+      const from = autoIdByTerm.get(link.term);
+      if (!from || !nodes.has(from) || !nodes.has(link.parentId)) continue;
+      edges.push({
+        from,
+        to: link.parentId,
+        type: 'subclass_of',
+        source: 'morphology',
+        confidence: link.confidence,
+      });
+    }
     console.log(
-      `自动术语 ${autoFile.terms.length} 条 → 去重后 ${unused.length} → 并入 ${autoMerged}（上限 ${MAX_AUTO_TERMS}）`,
+      `自动术语 ${autoFile.terms.length} 条 → 去重后 ${unused.length} → 并入 ${autoMerged}（上限 ${MAX_AUTO_TERMS}）` +
+        `；构词归属 ${taxoLinks.length} 条`,
     );
   } else {
     console.log('未找到 data/graph/terms.auto.json，图谱仅含策展词表（可运行 npm run extract-terms）');

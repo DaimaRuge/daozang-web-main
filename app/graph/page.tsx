@@ -2,12 +2,16 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import {
   expandNode,
+  getGraphAtlasIndex,
+  getGraphAtlasSection,
   getGraphStats,
   graphViewForQuery,
   isGraphAvailable,
+  parseAtlasType,
 } from '@/lib/graph/query';
 import { NODE_ORIGIN_LABELS, NODE_TYPE_LABELS } from '@/lib/graph/schema';
 import GraphExplorer from '@/components/graph/GraphExplorer';
+import { GraphAtlasSectionView, GraphAtlasTiles } from '@/components/graph/GraphCatalog';
 
 /**
  * 知识图谱页（服务端组件）。
@@ -19,7 +23,7 @@ import GraphExplorer from '@/components/graph/GraphExplorer';
  */
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; id?: string }>;
+  searchParams: Promise<{ q?: string; id?: string; type?: string }>;
 }
 
 /** 图谱页的探索起点：覆盖符箓、内丹、科仪等主要语义域 */
@@ -39,9 +43,14 @@ const SEED_ENTRIES = [
 ];
 
 export async function generateMetadata({ searchParams }: PageProps): Promise<Metadata> {
-  const { q, id } = await searchParams;
+  const { q, id, type } = await searchParams;
   const focus = q || (id ? id.split(':')[1] : '');
-  const title = focus ? `${focus} · 关联图谱 | 道可道` : '道藏知识图谱 | 道可道';
+  const atlasType = parseAtlasType(type);
+  const title = focus
+    ? `${focus} · 关联图谱 | 道可道`
+    : atlasType
+      ? `${NODE_TYPE_LABELS[atlasType]} · 概念图 | 道可道`
+      : '道藏知识图谱 | 道可道';
   return {
     title,
     description: '以概念、宗派、人物、科仪为节点，展开道藏典籍之间的关联，并可回溯到原文出处。',
@@ -52,10 +61,13 @@ export default async function GraphPage({ searchParams }: PageProps) {
   const params = await searchParams;
   const query = (params.q ?? '').trim();
   const id = (params.id ?? '').trim();
+  const atlasType = parseAtlasType(params.type);
 
   const available = isGraphAvailable();
   const view = !available ? null : id ? expandNode(id) : query ? graphViewForQuery(query) : null;
   const stats = getGraphStats();
+  const atlasIndex = available && !view && !query ? getGraphAtlasIndex() : [];
+  const atlasSection = available && !view && !query && atlasType ? getGraphAtlasSection(atlasType) : null;
 
   return (
     <div className="animate-fade-in">
@@ -63,7 +75,8 @@ export default async function GraphPage({ searchParams }: PageProps) {
         <h1 className="text-2xl font-serif tracking-[0.2em] [text-indent:0.2em] mb-2">關聯圖譜</h1>
         <p className="text-sm text-[var(--muted)] leading-relaxed max-w-2xl">
           道藏卷帙浩繁，与其从头读起，不如从一个感兴趣的点向外走。
-          输入一个词或选一个入口，图谱会给出与它相关的概念、宗派、人物、科仪与典籍，
+          输入一个词、选一个入口，或按类型翻开概念图。
+          图谱会给出与它相关的概念、宗派、人物、科仪与典籍，
           每条关系都标明来源，可回溯到原文那一段。
         </p>
       </header>
@@ -93,7 +106,11 @@ export default async function GraphPage({ searchParams }: PageProps) {
         </p>
       )}
 
-      {available && !view && !query && (
+      {available && !view && !query && atlasSection && (
+        <GraphAtlasSectionView section={atlasSection} />
+      )}
+
+      {available && !view && !query && !atlasSection && (
         <section>
           <h2 className="text-sm text-[var(--muted)] tracking-wider mb-3">从这些入口开始</h2>
           <div className="flex flex-wrap gap-2 mb-8">
@@ -107,18 +124,7 @@ export default async function GraphPage({ searchParams }: PageProps) {
               </Link>
             ))}
           </div>
-
-          {stats && (
-            <p className="text-xs text-[var(--muted)] leading-relaxed">
-              当前图谱含 {stats.nodes.toLocaleString('zh-CN')} 个节点、
-              {stats.edges.toLocaleString('zh-CN')} 条关系，
-              由 {stats.works.toLocaleString('zh-CN')} 部典籍、约
-              {(stats.scannedChars / 1e6).toFixed(1)} 百万字原文扫描而成。
-              词表来自人工策展
-              {stats.autoEntities ? `与自动抽取（${stats.autoEntities.toLocaleString('zh-CN')} 条）` : ''}
-              ；关系分为目录事实、词表策展、原文提及与统计推算，界面上均如实标注。
-            </p>
-          )}
+          <GraphAtlasTiles items={atlasIndex} stats={stats} />
         </section>
       )}
 

@@ -24,10 +24,13 @@ import { GraphView, nodeId, parseNodeId } from '../lib/graph/schema';
 import {
   expandNode,
   getConceptLexicon,
+  getGraphAtlasIndex,
+  getGraphAtlasSection,
   graphForWork,
   graphViewForQuery,
   isGraphAvailable,
   mentionCitationsForQuery,
+  parseAtlasType,
   resolveQuery,
 } from '../lib/graph/query';
 import { GRAPH_ARTIFACT_MAX_BYTES, loadKnowledgeGraph } from '../lib/graph/load';
@@ -351,6 +354,43 @@ test('查询：本体词表含策展与自动术语，不含书名', skipReason,
   assert.ok(lexicon.includes('无为'), '简体别名应在词表中，供简体问句直接命中');
   assert.ok(lexicon.length >= 1000, `词表应覆盖并入的自动术语，实际 ${lexicon.length}`);
   assert.ok(!lexicon.some(t => t.includes('道法會元')), '典籍名不得进入对话分词词表');
+});
+
+test('查询：构词归属把太上元始天尊挂到元始天尊，且不把通名天尊挂到三清', skipReason, () => {
+  const child = resolveQuery('太上元始天尊');
+  const parent = resolveQuery('元始天尊');
+  assert.ok(child && parent);
+  const view = expandNode(parent.id);
+  assert.ok(view);
+  const subclasses = view.groups.find(g => g.type === 'subclass_of');
+  assert.ok(
+    subclasses?.items.some(i => i.node.id === child.id && i.edge.source === 'morphology'),
+    '元始天尊应列出构词下位「太上元始天尊」',
+  );
+  const sanqing = resolveQuery('三清');
+  assert.ok(sanqing);
+  const sq = expandNode(sanqing.id);
+  const sqChildren = sq?.groups.find(g => g.type === 'subclass_of');
+  assert.ok(
+    !sqChildren?.items.some(i => i.node.label.endsWith('天尊') && i.edge.source === 'morphology' && i.node.label.length > 4 && !['元始天尊', '靈寶天尊'].some(n => i.node.label.includes(n))),
+    '三清不应收纳逍遙快樂天尊这类通名',
+  );
+});
+
+test('查询：概念图目录按类型开架，不含典籍与题署人物', skipReason, () => {
+  assert.equal(parseAtlasType('deity'), 'deity');
+  assert.equal(parseAtlasType('work'), null);
+  const index = getGraphAtlasIndex();
+  assert.ok(index.some(i => i.type === 'concept' && i.curated >= 30));
+  const section = getGraphAtlasSection('concept');
+  assert.ok(section);
+  assert.ok(section.curated.some(e => e.label === '符籙' && e.shortDef));
+  assert.ok(!section.curated.some(e => e.id.startsWith('work:')));
+  assert.ok(section.auto.every(e => e.origin === 'auto'));
+  const persons = getGraphAtlasSection('person');
+  assert.ok(persons);
+  assert.ok(persons.curated.every(e => e.origin === 'curated'));
+  assert.ok(!persons.curated.some(e => e.label.includes('參知')));
 });
 
 test('查询：概念出处带回 blockId，供问答引用', skipReason, () => {

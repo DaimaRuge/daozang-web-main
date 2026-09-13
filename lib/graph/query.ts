@@ -17,12 +17,15 @@
 
 import {
   EDGE_LABELS,
+  GRAPH_ATLAS_TYPES,
   GraphCitation,
   GraphEdge,
   GraphEdgeType,
   GraphNode,
+  GraphNodeType,
   GraphView,
   KnowledgeGraph,
+  NODE_TYPE_LABELS,
   RelatedItem,
   RelationGroup,
 } from './schema';
@@ -159,6 +162,86 @@ export function isGraphAvailable(): boolean {
 
 export function getGraphStats(): KnowledgeGraph['stats'] | null {
   return getRuntime()?.graph.stats ?? null;
+}
+
+export interface GraphAtlasEntry {
+  id: string;
+  label: string;
+  shortDef?: string;
+  works?: number;
+  origin: 'curated' | 'auto';
+}
+
+export interface GraphAtlasTypeSummary {
+  type: GraphNodeType;
+  label: string;
+  curated: number;
+  auto: number;
+}
+
+export interface GraphAtlasSection {
+  type: GraphNodeType;
+  label: string;
+  curated: GraphAtlasEntry[];
+  auto: GraphAtlasEntry[];
+  autoTotal: number;
+}
+
+/** 自动术语在目录里只列提及最多的若干条，其余走检索，避免 600+ 芯片铺满首屏 */
+export const ATLAS_AUTO_LIMIT = 48;
+
+function toAtlasEntry(node: GraphNode): GraphAtlasEntry {
+  return {
+    id: node.id,
+    label: node.label,
+    shortDef: node.shortDef,
+    works: node.works,
+    origin: node.origin === 'auto' ? 'auto' : 'curated',
+  };
+}
+
+export function parseAtlasType(raw?: string): GraphNodeType | null {
+  if (!raw) return null;
+  return GRAPH_ATLAS_TYPES.includes(raw as GraphNodeType) ? (raw as GraphNodeType) : null;
+}
+
+/** /graph 首页的类型瓷砖：策展 + 自动各多少，不含目录题署人物 */
+export function getGraphAtlasIndex(): GraphAtlasTypeSummary[] {
+  const rt = getRuntime();
+  if (!rt) return [];
+  return GRAPH_ATLAS_TYPES.map(type => {
+    let curated = 0;
+    let auto = 0;
+    for (const node of rt.graph.nodes) {
+      if (node.type !== type) continue;
+      if (node.origin === 'auto') auto++;
+      else if (node.origin === 'curated') curated++;
+    }
+    return { type, label: NODE_TYPE_LABELS[type], curated, auto };
+  });
+}
+
+/** 某一类的概念图目录：策展词全列，自动术语按提及典籍数截断 */
+export function getGraphAtlasSection(type: GraphNodeType): GraphAtlasSection | null {
+  if (!GRAPH_ATLAS_TYPES.includes(type)) return null;
+  const rt = getRuntime();
+  if (!rt) return null;
+  const curated: GraphNode[] = [];
+  const auto: GraphNode[] = [];
+  for (const node of rt.graph.nodes) {
+    if (node.type !== type) continue;
+    if (node.origin === 'auto') auto.push(node);
+    else if (node.origin === 'curated') curated.push(node);
+  }
+  curated.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
+  auto.sort((a, b) => (b.works ?? 0) - (a.works ?? 0) || a.label.localeCompare(b.label, 'zh-Hant'));
+  return {
+    type,
+    label: NODE_TYPE_LABELS[type],
+    curated: curated.map(toAtlasEntry),
+    auto: auto.slice(0, ATLAS_AUTO_LIMIT).map(toAtlasEntry),
+    autoTotal: auto.length,
+  };
 }
 
 export function getNode(id: string): GraphNode | null {

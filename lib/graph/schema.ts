@@ -56,13 +56,14 @@ export type GraphEdgeType =
  * 也决定是否需要打「待考」标记。
  */
 export type GraphEdgeSource =
-  | 'catalog'    // 来自道藏目录本身（最可靠）
-  | 'gazetteer'  // 人工策展词表
-  | 'mention'    // 全库原文扫描
-  | 'cooccur'    // 共现统计（弱）
-  | 'similar'    // 相关度计算（弱）
-  | 'human'      // 人工审核确认
-  | 'llm';       // LLM 抽取（须进待审队列，当前未启用）
+  | 'catalog'     // 来自道藏目录本身（最可靠）
+  | 'gazetteer'   // 人工策展词表
+  | 'mention'     // 全库原文扫描
+  | 'morphology'  // 构词推断（自动术语挂到策展正名）
+  | 'cooccur'     // 共现统计（弱）
+  | 'similar'     // 相关度计算（弱）
+  | 'human'       // 人工审核确认
+  | 'llm';        // LLM 抽取（须进待审队列，当前未启用）
 
 /**
  * 节点从哪来。UI 据此决定是否展示「词表释义」还是「自动抽取」标记。
@@ -229,11 +230,22 @@ export const EDGE_SOURCE_LABELS: Record<GraphEdgeSource, string> = {
   catalog: '道藏目录',
   gazetteer: '词表策展',
   mention: '原文提及',
+  morphology: '构词推断',
   cooccur: '共现推算',
   similar: '相关度计算',
   human: '人工审定',
   llm: 'AI 抽取',
 };
+
+/** /graph 概念图目录展示的本体类型（不含典籍/部类/标签/图像） */
+export const GRAPH_ATLAS_TYPES: GraphNodeType[] = [
+  'concept',
+  'deity',
+  'ritual',
+  'sect',
+  'place',
+  'person',
+];
 
 /** 关系类型 → 中文分组标题（UI 与 Agent 共用同一套措辞） */
 export const EDGE_LABELS: Record<GraphEdgeType, string> = {
