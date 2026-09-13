@@ -21,7 +21,8 @@
     "generate:importmap": "payload generate:importmap",
     "generate:types": "payload generate:types",
     "import-sqlite": "tsx scripts/import-sqlite.ts",
-    "upload-media": "tsx scripts/upload-media.ts"
+    "upload-media": "tsx scripts/upload-media.ts",
+    "upload:daozang-scans": "tsx scripts/upload-daozang-scans.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1108.0",

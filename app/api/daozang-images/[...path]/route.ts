@@ -6,7 +6,8 @@
 import fs from 'fs';
 import path from 'path';
 import { NextResponse } from 'next/server';
-import { resolveDaozangImageFile } from '@/lib/daozang-images';
+import { classifyRequestedFile, resolveDaozangImageFile } from '@/lib/daozang-images';
+import { daozangPublicUrl } from '@/lib/daozang-image-url';
 
 interface RouteParams {
   params: Promise<{ path: string[] }>;
@@ -44,8 +45,17 @@ export async function GET(_req: Request, { params }: RouteParams) {
     return NextResponse.json({ error: 'unsupported type' }, { status: 400 });
   }
 
+  const kind = classifyRequestedFile(file);
+  if (!kind) {
+    return NextResponse.json({ error: 'unsupported type' }, { status: 400 });
+  }
+
   const hit = resolveDaozangImageFile(part, file);
   if (!hit) {
+    const mediaBase = process.env.NEXT_PUBLIC_MEDIA_BASE_URL ?? '';
+    if (mediaBase) {
+      return NextResponse.redirect(daozangPublicUrl(part, file, mediaBase), 302);
+    }
     return NextResponse.json({ error: 'not found' }, { status: 404 });
   }
   const resolved = path.resolve(hit.absPath);

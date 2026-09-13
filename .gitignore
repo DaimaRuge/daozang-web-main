@@ -14,7 +14,6 @@ data/daozang.db
 data/daozang.db-*
 data/images-daozang/
 data/images-daozang-meta/
-data/daozang-images.json
 data/daozang-tiny-skips.json
 
 # misc

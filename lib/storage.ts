@@ -8,7 +8,7 @@
 
 import crypto from 'crypto';
 import path from 'path';
-import { S3Client, PutObjectCommand, DeleteObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, PutObjectCommand, DeleteObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 
 export type MediaKind = 'audio' | 'image' | 'video';
@@ -103,6 +103,21 @@ export async function uploadObject(
     CacheControl: UPLOAD_CACHE_CONTROL,
   }));
   return publicUrl(key);
+}
+
+export async function objectExists(key: string): Promise<boolean> {
+  try {
+    await getClient().send(new HeadObjectCommand({ Bucket: getBucket(), Key: key }));
+    return true;
+  } catch (err) {
+    const status =
+      err && typeof err === 'object' && '$metadata' in err
+        ? (err as { $metadata?: { httpStatusCode?: number } }).$metadata?.httpStatusCode
+        : undefined;
+    const name = err && typeof err === 'object' && 'name' in err ? String((err as { name: string }).name) : '';
+    if (status === 404 || name === 'NotFound' || name === 'NotFoundError') return false;
+    throw err;
+  }
 }
 
 export async function deleteObject(key: string): Promise<void> {
