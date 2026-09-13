@@ -39,5 +39,5 @@ export function parseDaozangImageUrl(url: string): { part: string; file: string 
 
 /** 去掉原扩展以及 .ink / .cinnabar 变体后缀 */
 export function restoredStem(file: string): string {
-  return file.replace(/\.(ink|cinnabar)\.png$/i, '').replace(/\.(jpe?g|png|webp)$/i, '');
+  return file.replace(/\.(ink|cinnabar)\.(png|webp)$/i, '').replace(/\.(jpe?g|png|webp)$/i, '');
 }

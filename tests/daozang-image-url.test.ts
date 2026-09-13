@@ -9,7 +9,10 @@ import {
   daozangObjectKey,
   daozangPublicUrl,
   parseDaozangImageUrl,
+  restoredStem,
 } from '../lib/daozang-image-url';
+import { classifyRequestedFile } from '../lib/daozang-images';
+import { webCinnabarFile } from '../lib/daozang-web-images';
 
 describe('daozangObjectKey / daozangPublicUrl', () => {
   test('桶内 key 不编码，公开 URL 编码部名与文件名', () => {
@@ -22,6 +25,16 @@ describe('daozangObjectKey / daozangPublicUrl', () => {
 
   test('未配置 CDN 时退回站内 API', () => {
     assert.equal(daozangPublicUrl('洞真部', 'a.jpg', ''), daozangImageUrl('洞真部', 'a.jpg'));
+  });
+});
+
+describe('网页压缩文件名', () => {
+  test('cinnabar.webp 与 png 复原得到同一 stem', () => {
+    assert.equal(restoredStem('image086.cinnabar.webp'), 'image086');
+    assert.equal(restoredStem('image086.cinnabar.png'), 'image086');
+    assert.equal(webCinnabarFile('image086.jpg'), 'image086.cinnabar.webp');
+    assert.equal(classifyRequestedFile('image086.cinnabar.webp'), 'cinnabar');
+    assert.equal(classifyRequestedFile('image086.jpg'), 'scan');
   });
 });
 

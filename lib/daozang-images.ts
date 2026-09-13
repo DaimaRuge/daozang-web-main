@@ -15,6 +15,7 @@ import path from 'path';
 import { ContentBlock, ParsedBook } from './content-schema';
 import type { DaozangEntry } from './data';
 import { daozangImageUrl, restoredStem } from './daozang-image-url';
+import { hasWebCinnabar, webCinnabarFile } from './daozang-web-images';
 
 export { daozangImageUrl, parseDaozangImageUrl, restoredStem } from './daozang-image-url';
 
@@ -141,8 +142,8 @@ export function isTalismanContext(title: string, nearbyText = ''): boolean {
 
 export function classifyRequestedFile(file: string): DaozangImageKind | null {
   const lower = file.toLowerCase();
-  if (lower.endsWith('.ink.png')) return 'ink';
-  if (lower.endsWith('.cinnabar.png')) return 'cinnabar';
+  if (lower.endsWith('.ink.png') || lower.endsWith('.ink.webp')) return 'ink';
+  if (lower.endsWith('.cinnabar.png') || lower.endsWith('.cinnabar.webp')) return 'cinnabar';
   if (lower.endsWith('.png')) return 'restored';
   if (lower.endsWith('.jpg') || lower.endsWith('.jpeg') || lower.endsWith('.webp')) return 'scan';
   return null;
@@ -313,11 +314,16 @@ export function injectDaozangImages(
     hits.sort((a, b) => a.o - b.o);
     for (const hit of hits) {
       const presence = restoredLookup(hit.p, hit.f);
-      const restored = presence.ink || presence.cinnabar || presence.restored;
+      const webCinnabar = hasWebCinnabar(hit.p, hit.f);
+      const restored = presence.ink || presence.cinnabar || presence.restored || webCinnabar;
       const parser = restored ? DAOZANG_RESTORED_PARSER : DAOZANG_IMAGES_PARSER;
       const imgId = `${block.id}-dzimg-${seq++}`;
       const preferCinnabar = isTalismanContext(book.title, block.content);
-      const fileForUrl = restored ? displayRestoredFile(hit, presence, preferCinnabar) : hit.f;
+      const fileForUrl = webCinnabar
+        ? webCinnabarFile(hit.f)
+        : restored
+          ? displayRestoredFile(hit, presence, preferCinnabar)
+          : hit.f;
       const stem = restoredStem(hit.f);
       const originalSrc = daozangImageUrl(hit.p, hit.f);
       blocks.push({
@@ -326,16 +332,22 @@ export function injectDaozangImages(
         content: daozangImageUrl(hit.p, fileForUrl),
         originalSrc,
         inkSrc: presence.ink ? daozangImageUrl(hit.p, `${stem}.ink.png`) : undefined,
-        cinnabarSrc: presence.cinnabar ? daozangImageUrl(hit.p, `${stem}.cinnabar.png`) : undefined,
+        cinnabarSrc: webCinnabar
+          ? daozangImageUrl(hit.p, webCinnabarFile(hit.f))
+          : presence.cinnabar
+            ? daozangImageUrl(hit.p, `${stem}.cinnabar.png`)
+            : undefined,
         sourceStart: block.sourceStart,
         sourceEnd: block.sourceEnd,
         confidence: 1,
         parser,
       });
       const size = hit.w && hit.h ? `，原扫描 ${hit.w}×${hit.h}` : '';
-      const caption = restored
-        ? `《${book.title}》原书插图「${hit.f}」的高清复原 PNG（透明底）${size}。悬停或长按对照原扫描。`
-        : `《${book.title}》原书插图「${hit.f}」${size}。低清扫描线稿，非 AI 生成。`;
+      const caption = webCinnabar
+        ? `《${book.title}》原书插图「${hit.f}」的网页压缩复原（朱砂透明 WebP）${size}。悬停或长按对照原扫描。高清母版不在本站公开。`
+        : restored
+          ? `《${book.title}》原书插图「${hit.f}」的高清复原 PNG（透明底）${size}。悬停或长按对照原扫描。`
+          : `《${book.title}》原书插图「${hit.f}」${size}。低清扫描线稿，非 AI 生成。`;
       blocks.push({
         id: `${imgId}-cap`,
         type: 'image-caption',
