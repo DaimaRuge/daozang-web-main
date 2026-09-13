@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "generatedAt": "2026-09-13T05:31:51.339Z",
+  "method": "cooccur-curated-auto-v1",
+  "edges": [
+    {
+      "from": "concept:auto-丹砂",
+      "to": "concept:waidan",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 142
+    },
+    {
+      "from": "concept:auto-丹砂",
+      "to": "concept:neidan",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 102
+    },
+    {
+      "from": "concept:auto-雷電",
+      "to": "concept:leifa",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 87
+    },
+    {
+      "from": "concept:auto-胞胎",
+      "to": "concept:taixi",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 70
+    },
+    {
+      "from": "concept:auto-設醮",
+      "to": "concept:jiaotan",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 70
+    },
+    {
+      "from": "concept:auto-喘息",
+      "to": "concept:taixi",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 61
+    },
+    {
+      "from": "concept:auto-金液還丹",
+      "to": "concept:neidan",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 57
+    },
+    {
+      "from": "person:auto-陶隱居",
+      "to": "person:taohongjing",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 21
+    },
+    {
+      "from": "person:auto-陸先生",
+      "to": "person:luxiujing",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 15
+    },
+    {
+      "from": "person:auto-重陽祖師",
+      "to": "person:wangchongyang",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 6
+    }
+  ]
+}

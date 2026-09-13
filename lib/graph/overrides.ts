@@ -40,7 +40,7 @@ export type {
 } from './override-schema';
 
 /** 统计推算类边：UI 标「待考」，也是审核队列的默认范围 */
-export const REVIEWABLE_EDGE_SOURCES: GraphEdgeSource[] = ['cooccur', 'similar'];
+export const REVIEWABLE_EDGE_SOURCES: GraphEdgeSource[] = ['cooccur', 'similar', 'extract', 'llm'];
 
 const SYMMETRIC_TYPES = new Set<GraphEdgeType>(['related_to', 'cooccurs_with', 'similar_work']);
 

@@ -266,6 +266,7 @@ function main(): void {
       id: nodeId(g.type, g.id),
       type: g.type,
       label: g.label,
+      aliases: g.aliases,
     }));
     const autoIdByTerm = new Map(picked.map(t => [t.term, nodeId(t.type, `auto-${t.term}`)]));
     const taxoLinks = pickTaxonomyLinks(

@@ -31,6 +31,8 @@ import {
 } from './schema';
 import { graphArtifactExists, loadKnowledgeGraph } from './load';
 import { applyGraphOverrides, loadGraphOverrides } from './overrides';
+import { applyGraphProposals, loadGraphProposals, resetGraphProposalsCache } from './proposals';
+import { atlasEntryMatches } from './atlas-filter';
 import { formatAuthor } from '../author';
 import { queryVariants } from '../zh-convert';
 import { getEntryById, searchEntries } from '../data';
@@ -74,7 +76,8 @@ function getRuntime(): GraphRuntime | null {
     _runtime = null;
     return null;
   }
-  const graph = applyGraphOverrides(raw, loadGraphOverrides());
+  const proposed = applyGraphProposals(raw, loadGraphProposals());
+  const graph = applyGraphOverrides(proposed, loadGraphOverrides());
   // 图谱产物里 work.meta.author 仍是构建当时的文件名题署；读入时再洗一次，
   // 与 lib/data.ts 的展示口径一致，且不必为改展示去重写 3MB gzip。
   for (const node of graph.nodes) {
@@ -104,6 +107,7 @@ function getRuntime(): GraphRuntime | null {
 export function resetGraphRuntime(): void {
   _runtime = undefined;
   _lexicon = undefined;
+  resetGraphProposalsCache();
 }
 
 /**
@@ -185,10 +189,14 @@ export interface GraphAtlasSection {
   curated: GraphAtlasEntry[];
   auto: GraphAtlasEntry[];
   autoTotal: number;
+  /** 当前筛选词；空表示未筛选 */
+  filter?: string;
 }
 
 /** 自动术语在目录里只列提及最多的若干条，其余走检索，避免 600+ 芯片铺满首屏 */
 export const ATLAS_AUTO_LIMIT = 48;
+/** 有筛选词时放开一些，否则简体冷门神名永远排不进前 48 */
+export const ATLAS_FILTER_LIMIT = 80;
 
 function toAtlasEntry(node: GraphNode): GraphAtlasEntry {
   return {
@@ -222,25 +230,29 @@ export function getGraphAtlasIndex(): GraphAtlasTypeSummary[] {
 }
 
 /** 某一类的概念图目录：策展词全列，自动术语按提及典籍数截断 */
-export function getGraphAtlasSection(type: GraphNodeType): GraphAtlasSection | null {
+export function getGraphAtlasSection(type: GraphNodeType, filter = ''): GraphAtlasSection | null {
   if (!GRAPH_ATLAS_TYPES.includes(type)) return null;
   const rt = getRuntime();
   if (!rt) return null;
+  const needle = filter.trim();
   const curated: GraphNode[] = [];
   const auto: GraphNode[] = [];
   for (const node of rt.graph.nodes) {
     if (node.type !== type) continue;
+    if (needle && !atlasEntryMatches(node.label, needle, queryVariants)) continue;
     if (node.origin === 'auto') auto.push(node);
     else if (node.origin === 'curated') curated.push(node);
   }
   curated.sort((a, b) => a.label.localeCompare(b.label, 'zh-Hant'));
   auto.sort((a, b) => (b.works ?? 0) - (a.works ?? 0) || a.label.localeCompare(b.label, 'zh-Hant'));
+  const autoCap = needle ? ATLAS_FILTER_LIMIT : ATLAS_AUTO_LIMIT;
   return {
     type,
     label: NODE_TYPE_LABELS[type],
     curated: curated.map(toAtlasEntry),
-    auto: auto.slice(0, ATLAS_AUTO_LIMIT).map(toAtlasEntry),
+    auto: auto.slice(0, autoCap).map(toAtlasEntry),
     autoTotal: auto.length,
+    filter: needle || undefined,
   };
 }
 

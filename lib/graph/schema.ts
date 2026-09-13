@@ -62,8 +62,9 @@ export type GraphEdgeSource =
   | 'morphology'  // 构词推断（自动术语挂到策展正名）
   | 'cooccur'     // 共现统计（弱）
   | 'similar'     // 相关度计算（弱）
+  | 'extract'     // 规则抽取的待审关系（三期，stand-off 提案）
   | 'human'       // 人工审核确认
-  | 'llm';        // LLM 抽取（须进待审队列，当前未启用）
+  | 'llm';        // LLM 抽取（须进待审队列）
 
 /**
  * 节点从哪来。UI 据此决定是否展示「词表释义」还是「自动抽取」标记。
@@ -233,6 +234,7 @@ export const EDGE_SOURCE_LABELS: Record<GraphEdgeSource, string> = {
   morphology: '构词推断',
   cooccur: '共现推算',
   similar: '相关度计算',
+  extract: '规则抽取',
   human: '人工审定',
   llm: 'AI 抽取',
 };

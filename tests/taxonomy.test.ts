@@ -3,15 +3,18 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { inferTaxonomyLink, pickTaxonomyLinks } from '../lib/graph/taxonomy';
+import { inferTaxonomyLink, MAX_MORPHOLOGY_CHILDREN, pickTaxonomyLinks } from '../lib/graph/taxonomy';
 
 const parents = [
-  { id: 'deity:yuanshi', type: 'deity', label: '元始天尊' },
+  { id: 'deity:yuanshi', type: 'deity', label: '元始天尊', aliases: ['元始'] },
   { id: 'deity:lingbao', type: 'deity', label: '靈寶天尊' },
   { id: 'deity:taiyi', type: 'deity', label: '太乙救苦天尊' },
-  { id: 'deity:laojun', type: 'deity', label: '太上老君' },
+  { id: 'deity:laojun', type: 'deity', label: '太上老君', aliases: ['老君'] },
   { id: 'deity:yuhuang', type: 'deity', label: '玉皇' },
   { id: 'deity:zhenwu', type: 'deity', label: '真武' },
+  { id: 'deity:ziwei', type: 'deity', label: '紫微', aliases: ['紫微大帝', '北極紫微'] },
+  { id: 'deity:dongyue', type: 'deity', label: '東嶽大帝', aliases: ['東嶽'] },
+  { id: 'deity:leizun', type: 'deity', label: '雷聲普化天尊', aliases: ['雷祖大帝'] },
   { id: 'concept:wuwei', type: 'concept', label: '無為' },
   { id: 'concept:dongtian', type: 'concept', label: '洞天福地' },
   { id: 'concept:sanqing', type: 'concept', label: '三清' },
@@ -61,6 +64,17 @@ test('中央黃老君不误认为太上老君的下位', () => {
   assert.equal(inferTaxonomyLink({ term: '中央黃老君', type: 'deity' }, parents), null);
 });
 
+test('神祇中缀与安全别名：紫微、東嶽、雷祖大帝', () => {
+  assert.equal(inferTaxonomyLink({ term: '北極紫微大帝', type: 'deity' }, parents)?.parentId, 'deity:ziwei');
+  assert.equal(inferTaxonomyLink({ term: '東嶽泰山君', type: 'deity' }, parents)?.parentId, 'deity:dongyue');
+  assert.equal(inferTaxonomyLink({ term: '九天雷祖大帝', type: 'deity' }, parents)?.parentId, 'deity:leizun');
+  assert.equal(inferTaxonomyLink({ term: '元始天王', type: 'deity' }, parents)?.parentId, 'deity:yuanshi');
+});
+
+test('二字别名不作后缀：聞天尊不挂到任何正名', () => {
+  assert.equal(inferTaxonomyLink({ term: '聞天尊', type: 'deity' }, parents), null);
+});
+
 test('每个上位截断子女数量', () => {
   const children = Array.from({ length: 20 }, (_, i) => ({
     term: `第${i}元始天尊`,
@@ -68,5 +82,5 @@ test('每个上位截断子女数量', () => {
   }));
   const links = pickTaxonomyLinks(children, parents);
   assert.ok(links.every(l => l.parentId === 'deity:yuanshi'));
-  assert.ok(links.length <= 12);
+  assert.ok(links.length <= MAX_MORPHOLOGY_CHILDREN);
 });

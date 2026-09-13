@@ -2,16 +2,18 @@
  * 自动术语 → 策展上位：只根据词形推断 subclass_of。
  *
  * 为什么不靠共现：共现把「無為」连到几乎所有高频词，图上没有层次。
- * 为什么不用别名表：策展别名含「自然」「道場」这类义项扩展，
+ * 为什么不用全部别名：策展别名含「自然」「道場」这类义项扩展，
  * 拿来做子串会把「希言自然」错挂到「無為」。
- * 只认策展正名，再加少数不会歧义的后缀（救苦天尊、洞天、福地）。
- * 推断边必须标 source=morphology，UI 显示「构词推断」，不得冒充词表策展。
+ * 别名只在「够长」或「是正名的组成部分」时参与（玉皇大帝、東嶽），
+ * 二字通名作后缀一律不认（老君 → 中央黃老君）。
+ * 推断边必须标 source=morphology，不得冒充词表策展。
  */
 
 export interface TaxonomyParent {
   id: string;
   type: string;
   label: string;
+  aliases?: string[];
 }
 
 export interface TaxonomyChild {
@@ -26,12 +28,11 @@ export interface TaxonomyLink {
   confidence: number;
 }
 
-/** 动词/介词粘在术语前：見老君、修黃籙齋、普告三界，不是下位名 */
-const NOISE_PREFIX = /^[見時入建設立尋告封履申登召諸修普]/;
+/** 动词/介词粘在术语前：見老君、修黃籙齋、聞天尊，不是下位名 */
+const NOISE_PREFIX = /^[見聞時入建設立尋告封履申登召諸修普]/;
 
 /**
  * 正名对不上、但后缀几乎不会歧义的挂靠。
- * 按后缀长度降序匹配，避免「天尊」抢在「靈寶天尊」前面。
  * 不把光秃秃的「天尊」挂到三清——那是神名通名，不是三清的下位。
  */
 const EXTRA_SUFFIX: Array<{ suffix: string; parentLabel: string; types?: string[] }> = [
@@ -48,13 +49,39 @@ function typesCompatible(child: string, parent: string): boolean {
   );
 }
 
-function scoreContainment(term: string, form: string): number | null {
+function scoreForm(
+  term: string,
+  form: string,
+  mode: 'full' | 'prefix' | 'infix',
+): number | null {
   if (form.length < 2 || term === form || term.length <= form.length) return null;
   if (!term.includes(form)) return null;
   const suffix = term.endsWith(form);
   const prefix = term.startsWith(form);
-  if (!suffix && !prefix) return null;
-  return (suffix ? 30 : 10) + form.length;
+  if (mode === 'prefix') return prefix ? 10 + form.length : null;
+  if (suffix) return 30 + form.length;
+  if (prefix) return 10 + form.length;
+  if (mode === 'infix') return 8 + form.length;
+  return null;
+}
+
+function parentForms(parent: TaxonomyParent): Array<{ form: string; mode: 'full' | 'prefix' | 'infix' }> {
+  const out: Array<{ form: string; mode: 'full' | 'prefix' | 'infix' }> = [
+    { form: parent.label, mode: parent.type === 'deity' ? 'infix' : 'full' },
+  ];
+  for (const alias of parent.aliases ?? []) {
+    const form = alias.trim();
+    if (!form || form === parent.label) continue;
+    if (form.length >= 3) {
+      out.push({ form, mode: 'full' });
+      continue;
+    }
+    // 二字别名只当前缀，且必须是正名的一部分：東嶽⊂東嶽大帝；老君作后缀会误收中央黃老君
+    if (form.length === 2 && parent.label.includes(form)) {
+      out.push({ form, mode: 'prefix' });
+    }
+  }
+  return out;
 }
 
 /** 一条自动术语最多挂一个策展上位；找不到就保持孤立，等共现或人工审边。 */
@@ -68,14 +95,16 @@ export function inferTaxonomyLink(
   let bestScore = -1;
   for (const parent of parents) {
     if (!typesCompatible(child.type, parent.type)) continue;
-    const score = scoreContainment(child.term, parent.label);
-    if (score == null || score <= bestScore) continue;
-    bestScore = score;
-    best = {
-      parentId: parent.id,
-      via: parent.label,
-      confidence: child.term.endsWith(parent.label) ? 0.8 : 0.76,
-    };
+    for (const { form, mode } of parentForms(parent)) {
+      const score = scoreForm(child.term, form, mode);
+      if (score == null || score <= bestScore) continue;
+      bestScore = score;
+      best = {
+        parentId: parent.id,
+        via: form,
+        confidence: child.term.endsWith(form) ? 0.8 : child.term.startsWith(form) ? 0.76 : 0.72,
+      };
+    }
   }
   if (best) return best;
 
@@ -92,8 +121,8 @@ export function inferTaxonomyLink(
   return null;
 }
 
-/** 每个上位最多收这么多构词子女，按 confidence 再按词长截断，避免洞天福地被山名淹没 */
-export const MAX_MORPHOLOGY_CHILDREN = 12;
+/** 每个上位最多收这么多构词子女，按 confidence 再按词长截断 */
+export const MAX_MORPHOLOGY_CHILDREN = 16;
 
 export function pickTaxonomyLinks(
   children: TaxonomyChild[],

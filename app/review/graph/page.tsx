@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import { loadKnowledgeGraph } from '@/lib/graph/load';
+import { applyGraphProposals, loadGraphProposals } from '@/lib/graph/proposals';
 import {
   listGraphReviewQueue,
   loadGraphOverrides,
@@ -36,7 +37,7 @@ function parseStatus(raw?: string): GraphReviewStatus {
 }
 
 function parseSource(raw?: string): GraphEdgeSource | 'all' {
-  return raw === 'cooccur' || raw === 'similar' ? raw : 'all';
+  return raw === 'cooccur' || raw === 'similar' || raw === 'extract' || raw === 'llm' ? raw : 'all';
 }
 
 export default async function GraphReviewPage({ searchParams }: PageProps) {
@@ -48,7 +49,8 @@ export default async function GraphReviewPage({ searchParams }: PageProps) {
   const q = sp.q ?? '';
   const page = Math.max(parseInt(sp.page ?? '1', 10) || 1, 1);
 
-  const graph = loadKnowledgeGraph();
+  const rawGraph = loadKnowledgeGraph();
+  const graph = rawGraph ? applyGraphProposals(rawGraph, loadGraphProposals()) : null;
   if (!graph) {
     return (
       <div className="animate-fade-in max-w-2xl">
@@ -99,7 +101,7 @@ export default async function GraphReviewPage({ searchParams }: PageProps) {
       <header className="mb-6">
         <h1 className="text-2xl font-serif tracking-wider mb-2">图谱审核</h1>
         <p className="text-xs text-[var(--muted)] leading-relaxed">
-          确认或否决统计推算出的「待考」关系。确认后图上改为「人工审定」；否决后该边不再展示。
+          确认或否决待考关系（共现、文献相关、规则抽取、AI 抽取）。确认后图上改为「人工审定」；否决后该边不再展示。
           校正写入 data/graph/overrides.json，请随代码一并提交。不改原文、不重建图谱产物。
         </p>
       </header>
@@ -127,6 +129,8 @@ export default async function GraphReviewPage({ searchParams }: PageProps) {
           <option value="all">全部来源</option>
           <option value="cooccur">共现推算</option>
           <option value="similar">文献相关</option>
+          <option value="extract">规则抽取</option>
+          <option value="llm">AI 抽取</option>
         </select>
         <button type="submit" className="px-4 py-2.5 text-sm rounded-lg border border-[var(--accent)] text-[var(--accent)]">
           筛选

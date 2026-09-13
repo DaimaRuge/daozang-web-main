@@ -1,0 +1,163 @@
+/**
+ * 待审关系提案（第三期 stand-off）。
+ *
+ * 为什么不写进 graph.json.gz：抽取规则或模型一变就要重扫 3500 万字；
+ * 提案是「建议增加的边」，与人工 overrides 一样叠在产物外面。
+ * 确认/否决仍走 overrides.json：确认 → human；否决 → 运行时删边。
+ *
+ * source 只允许 extract（规则）或 llm（模型）。不得标成 gazetteer / morphology。
+ */
+
+import fs from 'fs';
+import path from 'path';
+import type { GraphEdge, GraphEdgeSource, GraphEdgeType, KnowledgeGraph } from './schema';
+
+export interface GraphProposalEdge {
+  from: string;
+  to: string;
+  type: GraphEdgeType;
+  source: Extract<GraphEdgeSource, 'extract' | 'llm'>;
+  confidence: number;
+  weight?: number;
+}
+
+export interface GraphProposalsFile {
+  version: 1;
+  generatedAt?: string;
+  method?: string;
+  edges: GraphProposalEdge[];
+}
+
+const PROPOSALS_PATH = path.join(process.cwd(), 'data', 'graph', 'proposals.json');
+
+const EMPTY: GraphProposalsFile = { version: 1, edges: [] };
+
+let cache: GraphProposalsFile | null = null;
+
+export function loadGraphProposals(): GraphProposalsFile {
+  if (cache) return cache;
+  try {
+    const parsed = JSON.parse(fs.readFileSync(PROPOSALS_PATH, 'utf-8')) as GraphProposalsFile;
+    cache = parsed?.version === 1 && Array.isArray(parsed.edges) ? parsed : { ...EMPTY };
+  } catch {
+    cache = { ...EMPTY };
+  }
+  return cache;
+}
+
+export function resetGraphProposalsCache(): void {
+  cache = null;
+}
+
+function edgeKey(e: Pick<GraphEdge, 'from' | 'to' | 'type'>): string {
+  return `${e.from}|${e.type}|${e.to}`;
+}
+
+/** 把提案边并入图谱；已有同向同类型边不覆盖产物里的证据 */
+export function applyGraphProposals(
+  graph: KnowledgeGraph,
+  proposals: GraphProposalsFile = loadGraphProposals(),
+): KnowledgeGraph {
+  if (!proposals.edges.length) return graph;
+  const existing = new Set(graph.edges.map(edgeKey));
+  const extra: GraphEdge[] = [];
+  for (const p of proposals.edges) {
+    if (p.source !== 'extract' && p.source !== 'llm') continue;
+    if (p.type !== 'related_to' && p.type !== 'subclass_of') continue;
+    if (!(p.confidence > 0 && p.confidence < 1)) continue;
+    if (!p.from || !p.to || p.from === p.to) continue;
+    if (existing.has(edgeKey(p))) continue;
+    existing.add(edgeKey(p));
+    extra.push({
+      from: p.from,
+      to: p.to,
+      type: p.type,
+      source: p.source,
+      confidence: p.confidence,
+      weight: p.weight,
+    });
+  }
+  if (extra.length === 0) return graph;
+  const edges = graph.edges.concat(extra);
+  return {
+    ...graph,
+    edges,
+    stats: { ...graph.stats, edges: edges.length },
+  };
+}
+
+const LEXICON = new Set(['concept', 'deity', 'person', 'place', 'ritual', 'sect']);
+
+/** 神名/科仪通名不参与「共享用字」判断，否则天尊之间全被当成相关 */
+const TITLE_AFFIX = /天尊|真君|大帝|帝君|夫人|元君|星君|真人|先生|[山嶽峰巖洞府宮觀]/;
+
+function sharesContentChar(a: string, b: string): boolean {
+  const x = a.replace(TITLE_AFFIX, '');
+  const y = b.replace(TITLE_AFFIX, '');
+  if (x.length < 1 || y.length < 1) return false;
+  return [...x].some(ch => y.includes(ch));
+}
+
+/**
+ * 从已有共现里抽出「策展 ↔ 自动」且尚无策展/构词边的 related_to 候选。
+ * 这些边置信度压在待考线以下，必须进审核队列，不得直接当词表事实。
+ */
+export function extractRelationProposals(
+  graph: KnowledgeGraph,
+  limit = 60,
+): GraphProposalEdge[] {
+  const nodeById = new Map(graph.nodes.map(n => [n.id, n]));
+  const hard = new Set<string>();
+  for (const e of graph.edges) {
+    if (e.type === 'subclass_of' || e.type === 'related_to') {
+      hard.add(`${e.from}|${e.to}`);
+      hard.add(`${e.to}|${e.from}`);
+    }
+  }
+
+  const scored: Array<GraphProposalEdge & { w: number }> = [];
+  for (const e of graph.edges) {
+    if (e.type !== 'cooccurs_with') continue;
+    const a = nodeById.get(e.from);
+    const b = nodeById.get(e.to);
+    if (!a || !b) continue;
+    if (!LEXICON.has(a.type) || !LEXICON.has(b.type)) continue;
+    if (a.type !== b.type) continue;
+    const origins = [a.origin, b.origin];
+    if (!origins.includes('curated') || !origins.includes('auto')) continue;
+    const curated = a.origin === 'curated' ? a : b;
+    // 無為/長生等广布概念与几乎所有术语共现，提成 related_to 会污染「相关概念」
+    if ((curated.works ?? 0) > 420) continue;
+    if (!sharesContentChar(a.label, b.label)) continue;
+    if (hard.has(`${a.id}|${b.id}`)) continue;
+    const w = e.weight ?? 0;
+    if (w < 4) continue;
+    scored.push({
+      from: a.origin === 'auto' ? a.id : b.id,
+      to: a.origin === 'curated' ? a.id : b.id,
+      type: 'related_to',
+      source: 'extract',
+      confidence: 0.55,
+      weight: w,
+      w,
+    });
+  }
+  scored.sort((x, y) => y.w - x.w || x.from.localeCompare(y.from));
+  const seen = new Set<string>();
+  const out: GraphProposalEdge[] = [];
+  for (const row of scored) {
+    const key = `${row.from}|${row.to}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({
+      from: row.from,
+      to: row.to,
+      type: row.type,
+      source: row.source,
+      confidence: row.confidence,
+      weight: row.weight,
+    });
+    if (out.length >= limit) break;
+  }
+  return out;
+}

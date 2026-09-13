@@ -67,6 +67,9 @@ flowchart LR
   content --> build
   build --> artifact["public/data/graph.json.gz 单一产物"]
   artifact --> query["lib/graph/query.ts 只读查询"]
+  artifact --> propose["scripts/propose-relations.ts"]
+  propose --> proposals["data/graph/proposals.json 待审边"]
+  proposals --> query
   query --> search["搜索页折叠面板"]
   query --> page["/graph 页"]
   query --> reader["阅读页「本书关联」"]
@@ -80,7 +83,7 @@ flowchart LR
 | 产物形态 | 单一 `public/data/graph.json.gz`（gzip 后约 3MB；明文会超过 Vercel 函数包单文件上限），模块级缓存。不用「每节点一文件」：`public/data` 已有 1500+ 文件，再加数千碎文件只拖慢 git 与部署 |
 | 提及扫描 | Aho-Corasick（`lib/graph/matcher.ts`）。上千别名 × 3500 万字若逐词 `indexOf` 是数百亿次比较；自动机压成一遍扫描，最长匹配优先以免通用词淹没具体术语 |
 | 出处溯源 | 提及边存 `blockId`，借阅读器既有的 `#blockId` 深链（分页大部头会先翻页再闪烁）落到出现该词的那一段 |
-| 关系强弱 | 每条边带 `source` 与 `confidence`；共现按 Jaccard 排序而非原始次数（否则邻居全是「無為」「長生」等泛词）；低于 `LOW_CONFIDENCE` 的边 UI 标「待考」。人工在 `/review/graph` 确认或否决，校正写入 `data/graph/overrides.json`，查询层运行时叠加（确认 → `human` / 置信度 1；否决 → 运行时删除该边）。不改原文、不重写 `graph.json.gz` |
+| 关系强弱 | 每条边带 `source` 与 `confidence`；共现按 Jaccard 排序而非原始次数（否则邻居全是「無為」「長生」等泛词）；低于 `LOW_CONFIDENCE` 的边 UI 标「待考」。三期待审抽取（`source: extract`）写在 `data/graph/proposals.json`，查询层先叠加提案再叠加审边覆盖。人工在 `/review/graph` 确认或否决，校正写入 `data/graph/overrides.json`（确认 → `human` / 置信度 1；否决 → 运行时删除该边）。不改原文、不重写 `graph.json.gz`。无 LLM 密钥时不得写 `source: llm` |
 | 找关联文献 | 典籍间 `similar_work` 边由共享概念的 IDF 加权余弦算出，通用概念按文档频率剔除 |
 | 词表双来源 | ① 人工策展 `gazetteer.json`（带释义）；② 语料统计自动抽取 `terms.auto.json`（`npm run extract-terms`，无释义）。查询未命中实体时还有第三条路径：关键词 → 命中典籍 → 其概念边 |
 | 自动抽取 | n-gram + 凝固度/左右熵/部类偏离 + 逻辑回归（策展词为正例，L2 防饱和）。自动节点标「自动抽取」，只用频次与原文出处作证据，不编造 shortDef |
@@ -152,6 +155,7 @@ npm test             # 解析器 / 检索 / 图谱 / 术语抽取单测
 npm run build-index  # 从 data/daozang-text/*.txt 重建索引与内容 JSON
 npm run extract-terms # 从语料自动发现术语 → data/graph/terms.auto.json
 npm run build-graph  # 合并策展词与自动术语，重建 public/data/graph.json.gz
+npm run propose-relations # 从共现抽出待审边 → data/graph/proposals.json（不改 gzip）
 ```
 
 环境变量（均为可选，仅服务端）：
@@ -214,14 +218,17 @@ DZ_LLM_MODEL=deepseek-chat
 - 概念检索升级：已用图谱词表（策展 + 自动术语）做最长匹配分词，停用词切分仅补位；命中实体时问答引用图谱提及出处
 
 **知识图谱（第一期已落地，见上「知识图谱模块」）**
-- 已完成：schema 契约、94 条策展词表 + 1000 条自动术语、全库块级提及扫描、
+- 已完成：schema 契约、98 条策展词表 + 1000 条自动术语、全库块级提及扫描、
   概念共现与文献相关度、四个入口（搜索页 / `/graph` / 阅读页 / Agent 工具）
 - 第二期进行中：`/review/graph` 低置信度边人工审核（只写 `data/graph/overrides.json`，不碰原文）；
   题署人物已在读入时清洗（`lib/author.ts`，去「宋-宋-王慶升」类文件名噪声）；
   自动术语并入 1000 条（神祇/山川优先，叠词与「登山」类残片不占名额）；
   对话概念检索已改用该词表分词，并优先引用图谱提及边的原文出处；
-  `/graph` 按类型开架浏览（策展词 + 自动术语）；自动术语按构词挂到策展上位（`source: morphology`，不冒充词表策展）
-- 第三期：可选 LLM 关系抽取（产出必须进待审队列）；馆藏图像资产入图；
+  `/graph` 按类型开架浏览（策展词 + 自动术语）；`?type=&filter=` 对本类做简繁筛选；
+  自动术语按构词挂到策展上位（`source: morphology`，神祇正名允许中缀）；
+  三期已起步：`npm run propose-relations` 写出规则抽取待审边（`source: extract`），
+  `/review/graph` 可确认/否决；无密钥时不写 `source: llm`
+- 第三期后续：可选 LLM 关系抽取（产出必须进待审队列）；馆藏图像资产入图；
   向量检索作为实体解析失败时的辅助召回，而非替代本体边
 
 **中期**

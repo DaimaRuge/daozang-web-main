@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import {
   ATLAS_AUTO_LIMIT,
+  ATLAS_FILTER_LIMIT,
   GraphAtlasEntry,
   GraphAtlasSection,
   GraphAtlasTypeSummary,
@@ -56,6 +57,7 @@ export function GraphAtlasTiles({
 }
 
 export function GraphAtlasSectionView({ section }: { section: GraphAtlasSection }) {
+  const cap = section.filter ? ATLAS_FILTER_LIMIT : ATLAS_AUTO_LIMIT;
   return (
     <section>
       <div className="flex items-baseline justify-between gap-3 flex-wrap mb-4">
@@ -64,12 +66,43 @@ export function GraphAtlasSectionView({ section }: { section: GraphAtlasSection 
           返回类型目录
         </Link>
       </div>
+      <form action="/graph" method="get" className="mb-4 max-w-xl">
+        <input type="hidden" name="type" value={section.type} />
+        <div className="relative">
+          <input
+            type="text"
+            name="filter"
+            defaultValue={section.filter ?? ''}
+            placeholder="筛选本类，简体繁体均可，如「玉皇」"
+            className="w-full pl-5 pr-24 py-2.5 bg-[var(--card)] border border-[var(--border)] rounded-full text-sm font-serif focus:outline-none focus:border-[var(--accent)] transition-colors"
+          />
+          <button
+            type="submit"
+            className="absolute right-1.5 top-1/2 -translate-y-1/2 px-4 py-1 text-sm rounded-full bg-[var(--accent)] text-white hover:bg-[var(--accent-light)] transition-colors cursor-pointer"
+          >
+            筛选
+          </button>
+        </div>
+      </form>
       <p className="text-xs text-[var(--muted)] mb-4">
-        {section.curated.length} 条词表策展
-        {section.autoTotal > 0
-          ? ` · ${section.autoTotal} 条自动抽取（按提及典籍数列出前 ${Math.min(ATLAS_AUTO_LIMIT, section.autoTotal)}）`
-          : ''}
+        {section.filter
+          ? `「${section.filter}」命中 ${section.curated.length} 条策展、${section.autoTotal} 条自动抽取`
+          : `${section.curated.length} 条词表策展${
+              section.autoTotal > 0
+                ? ` · ${section.autoTotal} 条自动抽取（按提及典籍数列出前 ${Math.min(cap, section.autoTotal)}）`
+                : ''
+            }`}
+        {section.filter && (
+          <Link href={`/graph?type=${section.type}`} className="ml-2 text-[var(--accent)] hover:underline">
+            清除筛选
+          </Link>
+        )}
       </p>
+      {section.curated.length === 0 && section.auto.length === 0 && (
+        <p className="text-sm text-[var(--muted)] mb-6">
+          本类没有与「{section.filter}」匹配的词条。可改用上方「展开」在全图检索。
+        </p>
+      )}
 
       {section.curated.length > 0 && (
         <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">

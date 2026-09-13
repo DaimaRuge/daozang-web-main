@@ -487,7 +487,7 @@
       "id": "leizun",
       "type": "deity",
       "label": "雷聲普化天尊",
-      "aliases": ["雷聲普化天尊", "普化天尊", "雷祖", "九天應元"],
+      "aliases": ["雷聲普化天尊", "普化天尊", "雷祖", "雷祖大帝", "九天應元"],
       "shortDef": "雷部至尊，统摄雷霆诸将，为雷法系统的核心神明。",
       "seedEdges": [{ "to": "leifa", "type": "related_to" }]
     },
@@ -518,6 +518,38 @@
       "label": "文昌",
       "aliases": ["文昌", "文昌帝君", "梓潼"],
       "shortDef": "主文运科第的神明，相关阴骘、劝善文献流传甚广。"
+    },
+    {
+      "id": "ziwei",
+      "type": "deity",
+      "label": "紫微",
+      "aliases": ["紫微", "紫微大帝", "北極紫微", "紫微垣"],
+      "shortDef": "紫微垣主星的神格，常与北极、天皇并称，为星斗崇拜与章奏所告的至上星君之一。",
+      "seedEdges": [{ "to": "doumu", "type": "related_to" }]
+    },
+    {
+      "id": "tianhuang",
+      "type": "deity",
+      "label": "天皇大帝",
+      "aliases": ["天皇大帝", "天皇", "鉤陳"],
+      "shortDef": "星斗信仰中的至上星帝之一，常与紫微对举，主天象与帝座。",
+      "seedEdges": [{ "to": "ziwei", "type": "related_to" }]
+    },
+    {
+      "id": "beidou",
+      "type": "deity",
+      "label": "北斗",
+      "aliases": ["北斗", "北斗星君", "七元", "北斗七元"],
+      "shortDef": "北斗七星的神格系统，主司命籍与延寿，相关灯仪、拜斗科仪极多。",
+      "seedEdges": [{ "to": "doumu", "type": "related_to" }]
+    },
+    {
+      "id": "xuzhenjun",
+      "type": "deity",
+      "label": "許真君",
+      "aliases": ["許真君", "许真君", "許遜", "许逊", "許旌陽"],
+      "shortDef": "东晋许逊的神格，净明道所宗祖师，以忠孝净明与斩蛟治水传说著称。",
+      "seedEdges": [{ "to": "jingming", "type": "related_to" }]
     },
     {
       "id": "laozi",

@@ -23,7 +23,7 @@ import { GraphAtlasSectionView, GraphAtlasTiles } from '@/components/graph/Graph
  */
 
 interface PageProps {
-  searchParams: Promise<{ q?: string; id?: string; type?: string }>;
+  searchParams: Promise<{ q?: string; id?: string; type?: string; filter?: string }>;
 }
 
 /** 图谱页的探索起点：覆盖符箓、内丹、科仪等主要语义域 */
@@ -67,7 +67,10 @@ export default async function GraphPage({ searchParams }: PageProps) {
   const view = !available ? null : id ? expandNode(id) : query ? graphViewForQuery(query) : null;
   const stats = getGraphStats();
   const atlasIndex = available && !view && !query ? getGraphAtlasIndex() : [];
-  const atlasSection = available && !view && !query && atlasType ? getGraphAtlasSection(atlasType) : null;
+  const atlasSection =
+    available && !view && !query && atlasType
+      ? getGraphAtlasSection(atlasType, params.filter ?? '')
+      : null;
 
   return (
     <div className="animate-fade-in">

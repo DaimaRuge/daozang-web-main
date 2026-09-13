@@ -377,6 +377,30 @@ test('查询：构词归属把太上元始天尊挂到元始天尊，且不把�
   );
 });
 
+test('查询：规则抽取的待审边在运行时可见', skipReason, () => {
+  const dansha = resolveQuery('丹砂');
+  assert.ok(dansha);
+  const view = expandNode(dansha.id);
+  const related = view?.groups.find(g => g.type === 'related_to');
+  assert.ok(
+    related?.items.some(i => i.node.label === '外丹' && i.edge.source === 'extract'),
+    '丹砂应有待审的「外丹」抽取边',
+  );
+});
+
+test('查询：紫微收纳北極紫微大帝；許真君为策展神祇', skipReason, () => {
+  const ziwei = resolveQuery('紫微');
+  assert.ok(ziwei && ziwei.origin === 'curated');
+  const view = expandNode(ziwei.id);
+  const children = view?.groups.find(g => g.type === 'subclass_of');
+  assert.ok(
+    children?.items.some(i => i.node.label.includes('紫微') && i.edge.source === 'morphology'),
+    '紫微应有构词下位',
+  );
+  const xu = resolveQuery('许真君');
+  assert.ok(xu && xu.origin === 'curated' && xu.shortDef);
+});
+
 test('查询：概念图目录按类型开架，不含典籍与题署人物', skipReason, () => {
   assert.equal(parseAtlasType('deity'), 'deity');
   assert.equal(parseAtlasType('work'), null);
@@ -391,6 +415,10 @@ test('查询：概念图目录按类型开架，不含典籍与题署人物', sk
   assert.ok(persons);
   assert.ok(persons.curated.every(e => e.origin === 'curated'));
   assert.ok(!persons.curated.some(e => e.label.includes('參知')));
+  const filtered = getGraphAtlasSection('deity', '玉皇');
+  assert.ok(filtered);
+  assert.ok(filtered.curated.some(e => e.label === '玉皇'));
+  assert.ok(filtered.curated.every(e => e.label.includes('玉皇')));
 });
 
 test('查询：概念出处带回 blockId，供问答引用', skipReason, () => {

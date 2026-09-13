@@ -10,6 +10,7 @@
     "test": "tsx --test tests/*.test.ts",
     "build-index": "tsx scripts/build-index.ts",
     "build-graph": "tsx scripts/build-graph.ts",
+    "propose-relations": "tsx scripts/propose-relations.ts",
     "extract-terms": "tsx --max-old-space-size=8192 scripts/extract-terms.ts"
   },
   "dependencies": {
