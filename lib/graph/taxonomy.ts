@@ -46,11 +46,27 @@ const EXTRA_SUFFIX: Array<{ suffix: string; parentLabel: string; types?: string[
   { suffix: '恆山', parentLabel: '北嶽', types: ['place'] },
 ];
 
+/**
+ * 词形上不是正名的子串，但部类/阴阳对待几乎不会歧义。
+ * 「洞真」挂「三洞」，不要把洞真写成三洞的别名，否则扫描会吞掉下位。
+ */
+const EXACT_PARENT: Array<{ term: string; parentLabel: string; types?: string[] }> = [
+  { term: '洞真', parentLabel: '三洞' },
+  { term: '洞玄', parentLabel: '三洞' },
+  { term: '洞神', parentLabel: '三洞' },
+  { term: '大洞', parentLabel: '三洞' },
+  { term: '少陽', parentLabel: '陰陽' },
+  { term: '少陰', parentLabel: '陰陽' },
+  { term: '高上玉皇', parentLabel: '玉皇' },
+];
+
 function typesCompatible(child: string, parent: string): boolean {
   if (child === parent) return true;
   return (
     (child === 'ritual' && parent === 'concept') ||
-    (child === 'concept' && parent === 'ritual')
+    (child === 'concept' && parent === 'ritual') ||
+    // 高上玉皇一类神号被抽成概念，仍应挂到神祇正名
+    (child === 'concept' && parent === 'deity')
   );
 }
 
@@ -95,6 +111,14 @@ export function inferTaxonomyLink(
   parents: readonly TaxonomyParent[],
 ): TaxonomyLink | null {
   if (NOISE_PREFIX.test(child.term)) return null;
+
+  for (const rule of EXACT_PARENT) {
+    if (child.term !== rule.term) continue;
+    if (rule.types && !rule.types.includes(child.type)) continue;
+    const parent = parents.find(p => p.label === rule.parentLabel);
+    if (!parent || !typesCompatible(child.type, parent.type)) continue;
+    return { parentId: parent.id, via: rule.parentLabel, confidence: 0.85 };
+  }
 
   let best: TaxonomyLink | null = null;
   let bestScore = -1;

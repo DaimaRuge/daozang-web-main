@@ -462,6 +462,46 @@ test('查询：构词归属把太上元始天尊挂到元始天尊，且不把�
   );
 });
 
+test('查询：三清词表邻域含元始天尊；阴阳连到太极', skipReason, () => {
+  const sanqing = resolveQuery('三清');
+  assert.ok(sanqing && sanqing.origin === 'curated');
+  const sq = expandNode(sanqing.id);
+  const related = sq?.groups.find(g => g.type === 'related_to');
+  assert.ok(
+    related?.items.some(i => i.node.label === '元始天尊' && i.edge.source === 'gazetteer'),
+    '三清应有词表策展的「元始天尊」边',
+  );
+  const yinyang = resolveQuery('阴阳');
+  assert.ok(yinyang);
+  const yy = expandNode(yinyang.id);
+  const yyRelated = yy?.groups.find(g => g.type === 'related_to');
+  assert.ok(
+    yyRelated?.items.some(i => i.node.label === '太極' && i.edge.source === 'gazetteer'),
+    '陰陽应有词表策展的「太極」边',
+  );
+});
+
+test('查询：高上玉皇挂玉皇；洞真挂三洞', skipReason, () => {
+  const child = resolveQuery('高上玉皇');
+  const parent = resolveQuery('玉皇');
+  assert.ok(child && parent && child.origin === 'auto' && parent.origin === 'curated');
+  const view = expandNode(parent.id);
+  const subclasses = view?.groups.find(g => g.type === 'subclass_of');
+  assert.ok(
+    subclasses?.items.some(i => i.node.id === child.id && i.edge.source === 'morphology'),
+    '玉皇应列出构词下位「高上玉皇」',
+  );
+  const dongzhen = resolveQuery('洞真');
+  const sandong = resolveQuery('三洞');
+  assert.ok(dongzhen && sandong && sandong.origin === 'curated');
+  const sd = expandNode(sandong.id);
+  const sdChildren = sd?.groups.find(g => g.type === 'subclass_of');
+  assert.ok(
+    sdChildren?.items.some(i => i.node.id === dongzhen.id && i.edge.source === 'morphology'),
+    '三洞应列出构词下位「洞真」',
+  );
+});
+
 test('查询：丹砂为策展概念并连到外丹', skipReason, () => {
   const dansha = resolveQuery('丹砂');
   assert.ok(dansha && dansha.origin === 'curated' && dansha.shortDef);

@@ -26,6 +26,8 @@ const parents = [
   { id: 'deity:nandou', type: 'deity', label: '南斗', aliases: ['南斗六司'] },
   { id: 'deity:qingdi', type: 'deity', label: '青帝', aliases: ['青帝君'] },
   { id: 'concept:dansha', type: 'concept', label: '丹砂' },
+  { id: 'concept:sandong', type: 'concept', label: '三洞' },
+  { id: 'concept:yinyang', type: 'concept', label: '陰陽' },
 ];
 
 test('后缀正名：太上元始天尊 → 元始天尊', () => {
@@ -88,6 +90,21 @@ test('太微前缀、南斗中缀、丹砂下位、衡山约定后缀', () => {
   assert.equal(inferTaxonomyLink({ term: '伏火丹砂', type: 'concept' }, parents)?.parentId, 'concept:dansha');
   assert.equal(inferTaxonomyLink({ term: '祝融衡山', type: 'place' }, parents)?.parentId, 'place:nanyue');
   assert.equal(inferTaxonomyLink({ term: '東方青帝君', type: 'deity' }, parents)?.parentId, 'deity:qingdi');
+});
+
+test('概念可挂神祇正名：高上玉皇 → 玉皇', () => {
+  assert.equal(
+    inferTaxonomyLink({ term: '高上玉皇', type: 'concept' }, parents)?.parentId,
+    'deity:yuhuang',
+  );
+});
+
+test('约定整词：洞真/洞玄/大洞 → 三洞；少陽/少陰 → 陰陽', () => {
+  assert.equal(inferTaxonomyLink({ term: '洞真', type: 'concept' }, parents)?.parentId, 'concept:sandong');
+  assert.equal(inferTaxonomyLink({ term: '洞玄', type: 'concept' }, parents)?.parentId, 'concept:sandong');
+  assert.equal(inferTaxonomyLink({ term: '大洞', type: 'concept' }, parents)?.parentId, 'concept:sandong');
+  assert.equal(inferTaxonomyLink({ term: '少陽', type: 'concept' }, parents)?.parentId, 'concept:yinyang');
+  assert.equal(inferTaxonomyLink({ term: '少陰', type: 'concept' }, parents)?.parentId, 'concept:yinyang');
 });
 
 test('每个上位截断子女数量', () => {
