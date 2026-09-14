@@ -34,6 +34,8 @@ import {
   resolveQuery,
 } from '../lib/graph/query';
 import { GRAPH_ARTIFACT_MAX_BYTES, loadKnowledgeGraph } from '../lib/graph/load';
+import { applyGraphProposals, loadGraphProposals } from '../lib/graph/proposals';
+import { listGraphReviewQueue, loadGraphOverrides } from '../lib/graph/overrides';
 
 // ---------- 匹配器 ----------
 
@@ -418,6 +420,27 @@ test('查询：别名并入策展；五嶽与太微可解析', skipReason, () =>
   assert.ok(huanglao && huanglao.origin === 'curated' && huanglao.label === '中央黃老君');
   const qing = resolveQuery('青帝');
   assert.ok(qing && qing.origin === 'curated');
+});
+
+test('查询：政策裁定后人工待审队列为空；無為连到清靜而非广布共现', skipReason, () => {
+  const raw = loadKnowledgeGraph();
+  assert.ok(raw);
+  const queue = listGraphReviewQueue(
+    applyGraphProposals(raw, loadGraphProposals()),
+    loadGraphOverrides(),
+    { status: 'pending' },
+  );
+  assert.equal(queue.pending, 0, '待考共现应已由 review-relations 落盘，文献近邻不进队列');
+  const wuwei = resolveQuery('无为');
+  assert.ok(wuwei);
+  const view = expandNode(wuwei.id);
+  const related = view?.groups.find(g => g.type === 'related_to');
+  assert.ok(related?.items.some(i => i.node.label === '清靜'), '無為应有清靜词表边');
+  const co = view?.groups.find(g => g.type === 'cooccurs_with');
+  assert.ok(
+    !co?.items.some(i => i.node.label === '長生' || i.node.label === '陰陽'),
+    '广布共现不应再占無為邻域',
+  );
 });
 
 test('查询：已审抽取边确认可见、否决不再展示', skipReason, () => {

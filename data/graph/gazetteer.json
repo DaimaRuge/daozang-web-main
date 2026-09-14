@@ -217,7 +217,8 @@
       "type": "concept",
       "label": "無為",
       "aliases": ["無為", "無爲", "无为", "自然"],
-      "shortDef": "《老子》核心主张，指不妄作、循物性而行，非消极不动。"
+      "shortDef": "《老子》核心主张，指不妄作、循物性而行，非消极不动。",
+      "seedEdges": [{ "to": "qingjing", "type": "related_to" }]
     },
     {
       "id": "qingjing",

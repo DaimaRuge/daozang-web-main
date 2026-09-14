@@ -101,8 +101,9 @@ export default async function GraphReviewPage({ searchParams }: PageProps) {
       <header className="mb-6">
         <h1 className="text-2xl font-serif tracking-wider mb-2">图谱审核</h1>
         <p className="text-xs text-[var(--muted)] leading-relaxed">
-          确认或否决待考关系（共现、文献相关、规则抽取、AI 抽取）。确认后图上改为「人工审定」；否决后该边不再展示。
-          校正写入 data/graph/overrides.json，请随代码一并提交。不改原文、不重建图谱产物。
+          队列只收规则/模型抽取，以及政策裁定过的共现（近义确认、广布噪声否决）。
+          文献近邻与其余弱共现仍在图上标「待考」，不占人工队列。
+          确认后改为「人工审定」；否决后该边不再展示。校正写入 overrides.json，不改原文。
         </p>
       </header>
 

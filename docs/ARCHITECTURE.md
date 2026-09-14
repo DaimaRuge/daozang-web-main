@@ -69,12 +69,14 @@ flowchart LR
   artifact --> query["lib/graph/query.ts 只读查询"]
   artifact --> propose["scripts/propose-relations.ts"]
   propose --> proposals["data/graph/proposals.json 待审边"]
+  artifact --> reviewRel["scripts/review-relations.ts"]
+  reviewRel --> ov
   proposals --> query
   query --> search["搜索页折叠面板"]
   query --> page["/graph 页"]
   query --> reader["阅读页「本书关联」"]
   query --> agent["Agent find_related_concepts"]
-  ov["data/graph/overrides.json 人工审边"] --> query
+  ov["data/graph/overrides.json 审边校正"] --> query
 ```
 
 | 关注点 | 决策与理由 |
@@ -83,7 +85,7 @@ flowchart LR
 | 产物形态 | 单一 `public/data/graph.json.gz`（gzip 后约 3MB；明文会超过 Vercel 函数包单文件上限），模块级缓存。不用「每节点一文件」：`public/data` 已有 1500+ 文件，再加数千碎文件只拖慢 git 与部署 |
 | 提及扫描 | Aho-Corasick（`lib/graph/matcher.ts`）。上千别名 × 3500 万字若逐词 `indexOf` 是数百亿次比较；自动机压成一遍扫描，最长匹配优先以免通用词淹没具体术语 |
 | 出处溯源 | 提及边存 `blockId`，借阅读器既有的 `#blockId` 深链（分页大部头会先翻页再闪烁）落到出现该词的那一段 |
-| 关系强弱 | 每条边带 `source` 与 `confidence`；共现按 Jaccard 排序而非原始次数（否则邻居全是「無為」「長生」等泛词）；低于 `LOW_CONFIDENCE` 的边 UI 标「待考」。三期待审抽取（`source: extract`）写在 `data/graph/proposals.json`，查询层先叠加提案再叠加审边覆盖。人工在 `/review/graph` 确认或否决，校正写入 `data/graph/overrides.json`（确认 → `human` / 置信度 1；否决 → 运行时删除该边）。不改原文、不重写 `graph.json.gz`。无 LLM 密钥时不得写 `source: llm` |
+| 关系强弱 | 每条边带 `source` 与 `confidence`；共现按 Jaccard 排序而非原始次数（否则邻居全是「無為」「長生」等泛词）；低于 `LOW_CONFIDENCE` 的边 UI 标「待考」。三期待审抽取（`source: extract`）写在 `data/graph/proposals.json`，查询层先叠加提案再叠加审边覆盖。人工队列只收抽取与高信号共现；文献近邻不进队列。`npm run review-relations` 按 `lib/graph/review-policy.ts` 批量确认近义/同域共现、否决广布噪声，已有键不覆盖。确认 → `human` / 置信度 1；否决 → 运行时删除该边。不改原文、不重写 `graph.json.gz`。无 LLM 密钥时不得写 `source: llm` |
 | 找关联文献 | 典籍间 `similar_work` 边由共享概念的 IDF 加权余弦算出，通用概念按文档频率剔除 |
 | 词表双来源 | ① 人工策展 `gazetteer.json`（带释义）；② 语料统计自动抽取 `terms.auto.json`（`npm run extract-terms`，无释义）。查询未命中实体时还有第三条路径：关键词 → 命中典籍 → 其概念边 |
 | 自动抽取 | n-gram + 凝固度/左右熵/部类偏离 + 逻辑回归（策展词为正例，L2 防饱和）。自动节点标「自动抽取」，只用频次与原文出处作证据，不编造 shortDef |
@@ -156,6 +158,7 @@ npm run build-index  # 从 data/daozang-text/*.txt 重建索引与内容 JSON
 npm run extract-terms # 从语料自动发现术语 → data/graph/terms.auto.json
 npm run build-graph  # 合并策展词与自动术语，重建 public/data/graph.json.gz
 npm run propose-relations # 从共现抽出待审边 → data/graph/proposals.json（不改 gzip）
+npm run review-relations # 按政策裁定待考共现 → data/graph/overrides.json（不改 gzip）
 ```
 
 环境变量（均为可选，仅服务端）：
@@ -228,7 +231,9 @@ DZ_LLM_MODEL=deepseek-chat
   自动术语按构词挂到策展上位（`source: morphology`，神祇正名允许中缀）；
   三期已起步：`npm run propose-relations` 写出规则抽取待审边（`source: extract`），
   含近义别名与科仪↔概念；有密钥时可复核为 `source: llm`（仍低于待考线）；
-  `/review/graph` 支持本页批量确认/否决；无密钥时不写 `source: llm`
+  `/review/graph` 支持本页批量确认/否决；无密钥时不写 `source: llm`；
+  待考共现由 `npm run review-relations` 按政策裁定（近义确认、广布否决），
+  文献近邻留图不进队列；無為补清靜词表边
 - 第三期后续：可选 LLM 关系抽取（产出必须进待审队列）；馆藏图像资产入图；
   向量检索作为实体解析失败时的辅助召回，而非替代本体边
 

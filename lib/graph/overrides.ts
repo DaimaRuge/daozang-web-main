@@ -15,12 +15,12 @@
 
 import fs from 'fs';
 import path from 'path';
-import { LOW_CONFIDENCE } from '../content-schema';
 import {
   EDGE_LABELS,
   GraphEdge,
   GraphEdgeSource,
   GraphEdgeType,
+  GraphNode,
   KnowledgeGraph,
 } from './schema';
 import type {
@@ -30,6 +30,7 @@ import type {
   GraphReviewItem,
   GraphReviewStatus,
 } from './override-schema';
+import { shouldQueueForReview } from './review-policy';
 
 export type {
   GraphEdgeDecision,
@@ -39,7 +40,7 @@ export type {
   GraphReviewStatus,
 } from './override-schema';
 
-/** 统计推算类边：UI 标「待考」，也是审核队列的默认范围 */
+/** 可筛选的统计来源。文献近邻默认不进待审队列，见 shouldQueueForReview。 */
 export const REVIEWABLE_EDGE_SOURCES: GraphEdgeSource[] = ['cooccur', 'similar', 'extract', 'llm'];
 
 const SYMMETRIC_TYPES = new Set<GraphEdgeType>(['related_to', 'cooccurs_with', 'similar_work']);
@@ -132,14 +133,18 @@ export interface GraphReviewPage {
   rejected: number;
 }
 
-function isPendingEdge(edge: GraphEdge, decision: GraphEdgeDecision | null): boolean {
-  return !decision
-    && edge.confidence < LOW_CONFIDENCE
-    && REVIEWABLE_EDGE_SOURCES.includes(edge.source);
+function isPendingEdge(
+  edge: GraphEdge,
+  decision: GraphEdgeDecision | null,
+  from: GraphNode | undefined,
+  to: GraphNode | undefined,
+): boolean {
+  return !decision && shouldQueueForReview(edge, from, to);
 }
 
 /**
- * 审核队列：默认只列出统计推算且低于 LOW_CONFIDENCE 的边。
+ * 审核队列：只收规则/模型抽取，以及政策裁定为确认的高信号共现。
+ * 文献近邻与其余弱共现留在图上标待考，不占人工队列；广布噪声由批量脚本否决。
  * 已校正的边无论原置信度如何都出现在对应分栏，便于复查/撤销。
  * 分栏计数不受检索词/来源筛选影响，避免切筛选时徽章乱跳。
  */
@@ -163,19 +168,20 @@ export function listGraphReviewQueue(
   for (const edge of graph.edges) {
     const key = edgeOverrideKeyOf(edge);
     const decision = overrides.edges[key]?.decision ?? null;
+    const from = nodeById.get(edge.from);
+    const to = nodeById.get(edge.to);
+    const pendingNow = isPendingEdge(edge, decision, from, to);
 
     if (decision === 'confirm') confirmed++;
     else if (decision === 'reject') rejected++;
-    else if (isPendingEdge(edge, decision)) pending++;
+    else if (pendingNow) pending++;
 
-    const wantPending = status === 'pending' && isPendingEdge(edge, decision);
+    const wantPending = status === 'pending' && pendingNow;
     const wantConfirm = status === 'confirm' && decision === 'confirm';
     const wantReject = status === 'reject' && decision === 'reject';
     if (!wantPending && !wantConfirm && !wantReject) continue;
     if (sourceFilter && edge.source !== sourceFilter) continue;
 
-    const from = nodeById.get(edge.from);
-    const to = nodeById.get(edge.to);
     if (!from || !to) continue;
     if (needle && !from.label.includes(needle) && !to.label.includes(needle)) continue;
 

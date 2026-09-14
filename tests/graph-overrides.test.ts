@@ -108,17 +108,17 @@ test('无命中校正时返回原对象（零成本路径）', () => {
   );
 });
 
-test('审核队列默认只收统计推算的低置信度边，目录边不进待审', () => {
+test('审核队列不收目录边与文献近邻；高信号共现才进待审', () => {
   const graph = miniGraph([
     edge({ from: 'work:1', to: 'concept:部', type: 'part_of', source: 'catalog', confidence: 0.98 }),
-    edge({ from: 'concept:a', to: 'concept:b', type: 'cooccurs_with', source: 'cooccur', confidence: 0.5, weight: 10 }),
-    edge({ from: 'work:1', to: 'work:2', type: 'similar_work', source: 'similar', confidence: 0.8, weight: 1 }),
-    edge({ from: 'concept:c', to: 'concept:d', type: 'cooccurs_with', source: 'cooccur', confidence: 0.4, weight: 2 }),
+    edge({ from: 'concept:符籙', to: 'concept:神符', type: 'cooccurs_with', source: 'cooccur', confidence: 0.5, weight: 10 }),
+    edge({ from: 'work:1', to: 'work:2', type: 'similar_work', source: 'similar', confidence: 0.4, weight: 1 }),
+    edge({ from: 'concept:徘徊', to: 'concept:肌膚', type: 'cooccurs_with', source: 'cooccur', confidence: 0.4, weight: 2 }),
   ]);
   const page = listGraphReviewQueue(graph, EMPTY, { status: 'pending' });
-  assert.equal(page.pending, 2);
-  assert.equal(page.total, 2);
-  assert.equal(page.items[0].fromLabel, 'a', '权重大的待考边排在前面');
+  assert.equal(page.pending, 1);
+  assert.equal(page.total, 1);
+  assert.equal(page.items[0].fromLabel, '符籙');
   assert.equal(page.confirmed, 0);
 });
 
@@ -146,11 +146,11 @@ test('确认/否决后边进入对应分栏，待审计数下降', () => {
 
 test('节点名筛选只影响列表，不影响分栏计数', () => {
   const graph = miniGraph([
-    edge({ from: 'concept:無為', to: 'concept:清靜', type: 'cooccurs_with', source: 'cooccur', confidence: 0.5 }),
-    edge({ from: 'concept:三清', to: 'concept:玉清', type: 'cooccurs_with', source: 'cooccur', confidence: 0.5 }),
+    edge({ from: 'concept:符籙', to: 'concept:神符', type: 'cooccurs_with', source: 'cooccur', confidence: 0.5, weight: 10 }),
+    edge({ from: 'concept:雷電', to: 'concept:雷法', type: 'cooccurs_with', source: 'cooccur', confidence: 0.5, weight: 8 }),
   ]);
-  const page = listGraphReviewQueue(graph, EMPTY, { status: 'pending', q: '無為' });
+  const page = listGraphReviewQueue(graph, EMPTY, { status: 'pending', q: '符籙' });
   assert.equal(page.pending, 2);
   assert.equal(page.total, 1);
-  assert.equal(page.items[0].fromLabel, '無為');
+  assert.equal(page.items[0].fromLabel, '符籙');
 });

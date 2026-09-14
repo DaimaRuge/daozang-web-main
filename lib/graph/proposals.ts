@@ -91,11 +91,11 @@ const LEXICON = new Set(['concept', 'deity', 'person', 'place', 'ritual', 'sect'
 /** 神名/科仪通名不参与「共享用字」判断，否则天尊之间全被当成相关 */
 const TITLE_AFFIX = /天尊|真君|大帝|帝君|夫人|元君|星君|真人|先生|天師|祖師|隱居|法事|科儀|儀範|[山嶽峰巖洞府宮觀道場]/;
 
-function strippedLabel(label: string): string {
+export function strippedLabel(label: string): string {
   return label.replace(TITLE_AFFIX, '');
 }
 
-function sharesContentChar(a: string, b: string): boolean {
+export function sharesContentChar(a: string, b: string): boolean {
   const x = strippedLabel(a);
   const y = strippedLabel(b);
   if (x.length < 2 || y.length < 2) return false;
@@ -103,7 +103,7 @@ function sharesContentChar(a: string, b: string): boolean {
 }
 
 /** 去掉通名后同形或互相包含：陶隱居↔陶弘景、設醮儀↔醮壇 */
-function isNearAlias(a: string, b: string): boolean {
+export function isNearAlias(a: string, b: string): boolean {
   const x = strippedLabel(a);
   const y = strippedLabel(b);
   if (x.length < 1 || y.length < 1) return false;
@@ -116,7 +116,7 @@ function isNearAlias(a: string, b: string): boolean {
   return false;
 }
 
-function typesCompatibleForExtract(a: string, b: string): boolean {
+export function typesCompatibleForExtract(a: string, b: string): boolean {
   if (a === b && LEXICON.has(a)) return true;
   return (a === 'ritual' && b === 'concept') || (a === 'concept' && b === 'ritual');
 }
