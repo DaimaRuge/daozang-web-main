@@ -20,27 +20,30 @@ export async function POST(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
-  const { key, decision, remove } = (body ?? {}) as {
+  const { key, keys, decision, remove } = (body ?? {}) as {
     key?: string;
+    keys?: string[];
     decision?: GraphEdgeDecision;
     remove?: boolean;
   };
 
-  if (!key || !key.includes('|')) {
+  const batch = (keys?.length ? keys : key ? [key] : []).filter(k => k.includes('|'));
+  if (batch.length === 0) {
     return NextResponse.json({ error: '缺少有效的边键' }, { status: 400 });
   }
 
   if (remove || decision == null) {
-    saveGraphEdgeOverride(key, null);
+    for (const k of batch) saveGraphEdgeOverride(k, null);
     resetGraphRuntime();
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, count: batch.length });
   }
 
   if (!ALLOWED.includes(decision)) {
     return NextResponse.json({ error: `不支持的判定：${decision}` }, { status: 400 });
   }
 
-  saveGraphEdgeOverride(key, { decision, reviewedAt: Date.now() });
+  const reviewedAt = Date.now();
+  for (const k of batch) saveGraphEdgeOverride(k, { decision, reviewedAt });
   resetGraphRuntime();
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, count: batch.length });
 }

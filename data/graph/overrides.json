@@ -1,4 +1,65 @@
 {
   "version": 1,
-  "edges": {}
+  "edges": {
+    "deity:auto-北極紫微大帝|related_to|deity:beiji": {
+      "decision": "reject",
+      "reviewedAt": 1789345075125
+    },
+    "concept:auto-雷電|related_to|concept:leifa": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    },
+    "concept:auto-胞胎|related_to|concept:taixi": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    },
+    "concept:auto-設醮|related_to|concept:jiaotan": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    },
+    "concept:auto-黃婆|related_to|concept:huangya": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    },
+    "concept:auto-設醮|related_to|ritual:zhaijiao": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    },
+    "concept:auto-喘息|related_to|concept:taixi": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    },
+    "concept:auto-金液還丹|related_to|concept:neidan": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    },
+    "concept:auto-建齋|related_to|ritual:zhaijiao": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    },
+    "concept:auto-硫黃|related_to|concept:huangya": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    },
+    "concept:auto-建齋|related_to|ritual:huanglu": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    },
+    "deity:auto-度仙上聖天尊|related_to|deity:haosheng": {
+      "decision": "reject",
+      "reviewedAt": 1789345075125
+    },
+    "deity:auto-紫元夫人|related_to|deity:shangyuan": {
+      "decision": "reject",
+      "reviewedAt": 1789345075125
+    },
+    "deity:auto-北陰酆都大帝|related_to|deity:beiji": {
+      "decision": "reject",
+      "reviewedAt": 1789345075125
+    },
+    "person:auto-丹陽真人|related_to|person:wangchongyang": {
+      "decision": "confirm",
+      "reviewedAt": 1789345075125
+    }
+  }
 }

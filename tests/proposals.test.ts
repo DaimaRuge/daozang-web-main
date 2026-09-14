@@ -3,7 +3,7 @@
  */
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { applyGraphProposals, extractRelationProposals } from '../lib/graph/proposals';
+import { applyGraphProposals, extractRelationProposals, reviewProposalsWithLlm } from '../lib/graph/proposals';
 import type { GraphEdge, KnowledgeGraph } from '../lib/graph/schema';
 
 function graph(edges: GraphEdge[], nodes: KnowledgeGraph['nodes']): KnowledgeGraph {
@@ -82,6 +82,29 @@ test('抽取：三洞不得因剥掉「洞」而挂到三清', () => {
     ],
   );
   assert.equal(extractRelationProposals(g, 10).length, 0);
+});
+
+test('LLM 复核：接受标 llm，拒绝剔除；解析失败保持 extract', async () => {
+  const edges = [
+    { from: 'a', to: 'x', type: 'related_to' as const, source: 'extract' as const, confidence: 0.55 },
+    { from: 'b', to: 'y', type: 'related_to' as const, source: 'extract' as const, confidence: 0.55 },
+  ];
+  const nodes = [
+    { id: 'a', label: '雷電', type: 'concept' },
+    { id: 'x', label: '雷法', type: 'concept' },
+    { id: 'b', label: '三洞', type: 'concept' },
+    { id: 'y', label: '三清', type: 'concept' },
+  ];
+  const reviewed = await reviewProposalsWithLlm(edges, nodes, async () =>
+    JSON.stringify([{ i: 1, accept: true }, { i: 2, accept: false }]),
+  );
+  assert.equal(reviewed.length, 1);
+  assert.equal(reviewed[0].from, 'a');
+  assert.equal(reviewed[0].source, 'llm');
+  assert.ok(reviewed[0].confidence < 0.7);
+  const fallback = await reviewProposalsWithLlm(edges, nodes, async () => '不是 JSON');
+  assert.equal(fallback.length, 2);
+  assert.ok(fallback.every(e => e.source === 'extract'));
 });
 
 test('抽取：近义别名置信度更高；科仪可连概念', () => {

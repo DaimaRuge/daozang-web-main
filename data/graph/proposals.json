@@ -1,8 +1,16 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-14T00:06:21.425Z",
+  "generatedAt": "2026-09-14T00:17:32.434Z",
   "method": "cooccur-curated-auto-v1",
   "edges": [
+    {
+      "from": "deity:auto-北極紫微大帝",
+      "to": "deity:beiji",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.62,
+      "weight": 18
+    },
     {
       "from": "concept:auto-雷電",
       "to": "concept:leifa",
@@ -90,6 +98,30 @@
       "source": "extract",
       "confidence": 0.55,
       "weight": 28
+    },
+    {
+      "from": "deity:auto-紫元夫人",
+      "to": "deity:shangyuan",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 11
+    },
+    {
+      "from": "deity:auto-北陰酆都大帝",
+      "to": "deity:beiji",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 10
+    },
+    {
+      "from": "person:auto-丹陽真人",
+      "to": "person:wangchongyang",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 8
     }
   ]
 }

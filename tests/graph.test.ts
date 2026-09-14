@@ -412,6 +412,32 @@ test('查询：别名并入策展；五嶽与太微可解析', skipReason, () =>
   assert.ok(taiwei && (taiwei.label === '太微帝君' || taiwei.label.includes('太微')));
   const huang = resolveQuery('黄帝');
   assert.ok(huang && huang.origin === 'curated' && huang.type === 'person');
+  const yin = resolveQuery('文始先生');
+  assert.ok(yin && yin.origin === 'curated' && yin.label === '尹喜');
+  const huanglao = resolveQuery('中央黄老君');
+  assert.ok(huanglao && huanglao.origin === 'curated' && huanglao.label === '中央黃老君');
+  const qing = resolveQuery('青帝');
+  assert.ok(qing && qing.origin === 'curated');
+});
+
+test('查询：已审抽取边确认可见、否决不再展示', skipReason, () => {
+  const leidian = resolveQuery('雷电');
+  assert.ok(leidian);
+  const view = expandNode(leidian.id);
+  const related = view?.groups.find(g => g.type === 'related_to');
+  assert.ok(
+    related?.items.some(i => i.node.label === '雷法' && i.edge.source === 'human'),
+    '雷電→雷法应已人工确认',
+  );
+  const rejected = resolveQuery('度仙上聖天尊');
+  if (rejected) {
+    const rv = expandNode(rejected.id);
+    const rel = rv?.groups.find(g => g.type === 'related_to');
+    assert.ok(
+      !rel?.items.some(i => i.node.label === '好生度命天尊'),
+      '否决的天尊配对不应再出现',
+    );
+  }
 });
 
 test('查询：概念图目录按类型开架，不含典籍与题署人物', skipReason, () => {

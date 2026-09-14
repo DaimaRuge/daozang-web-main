@@ -473,7 +473,7 @@
       "id": "yuhuang",
       "type": "deity",
       "label": "玉皇",
-      "aliases": ["玉皇", "玉帝", "昊天", "玉皇大帝"],
+      "aliases": ["玉皇", "玉帝", "昊天", "玉皇大帝", "玉帝君"],
       "shortDef": "统御三界的至上帝君，宋代以后地位极隆，为章奏文书的主要奏告对象。"
     },
     {
@@ -628,7 +628,7 @@
       "id": "jinque",
       "type": "deity",
       "label": "金闕帝君",
-      "aliases": ["金闕帝君", "金阙帝君", "金闕"],
+      "aliases": ["金闕帝君", "金阙帝君", "金闕", "後聖帝君", "后圣帝君", "後聖"],
       "shortDef": "金阙上的帝君神格，章奏与神谱中常与玉皇、东华并列。",
       "seedEdges": [{ "to": "yuhuang", "type": "related_to" }]
     },
@@ -641,6 +641,105 @@
       "seedEdges": [{ "to": "beidou", "type": "related_to" }]
     },
     {
+      "id": "wudi",
+      "type": "deity",
+      "label": "五帝",
+      "aliases": ["五帝", "五方帝", "五方五帝"],
+      "shortDef": "五方帝君的合称，配五方五行，章奏与醮祭中常分位召请。",
+      "seedEdges": [{ "to": "wuxing", "type": "related_to" }]
+    },
+    {
+      "id": "qingdi",
+      "type": "deity",
+      "label": "青帝",
+      "aliases": ["青帝", "青帝君", "蒼帝"],
+      "shortDef": "东方青帝，五帝之一，主春生与木德。",
+      "seedEdges": [{ "to": "wudi", "type": "related_to" }]
+    },
+    {
+      "id": "chidi",
+      "type": "deity",
+      "label": "赤帝",
+      "aliases": ["赤帝", "赤帝君", "炎帝"],
+      "shortDef": "南方赤帝，五帝之一，主夏长与火德。",
+      "seedEdges": [{ "to": "wudi", "type": "related_to" }]
+    },
+    {
+      "id": "baidi",
+      "type": "deity",
+      "label": "白帝",
+      "aliases": ["白帝", "白帝君"],
+      "shortDef": "西方白帝，五帝之一，主秋收与金德。",
+      "seedEdges": [{ "to": "wudi", "type": "related_to" }]
+    },
+    {
+      "id": "heidi",
+      "type": "deity",
+      "label": "黑帝",
+      "aliases": ["黑帝", "黑帝君"],
+      "shortDef": "北方黑帝，五帝之一，主冬藏与水德。",
+      "seedEdges": [{ "to": "wudi", "type": "related_to" }]
+    },
+    {
+      "id": "taiyishen",
+      "type": "deity",
+      "label": "太一",
+      "aliases": ["太一", "太一帝君", "太一元君", "太一天尊", "太一真君"],
+      "shortDef": "北极太一星的神格，与太乙救苦天尊有别：前者偏星辰主宰，后者偏救度炼度。",
+      "seedEdges": [{ "to": "ziwei", "type": "related_to" }]
+    },
+    {
+      "id": "shifang",
+      "type": "deity",
+      "label": "十方天尊",
+      "aliases": ["十方天尊", "十方"],
+      "shortDef": "灵宝经系按十方安立的天尊群体，度人、斋醮常分方称请。",
+      "seedEdges": [
+        { "to": "lingbao", "type": "related_to" },
+        { "to": "duren", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "wuliang",
+      "type": "deity",
+      "label": "無量天尊",
+      "aliases": ["無量天尊", "无量天尊"],
+      "shortDef": "灵宝度人文献中常见的天尊圣号，取济度无量之义。",
+      "seedEdges": [{ "to": "duren", "type": "related_to" }]
+    },
+    {
+      "id": "nanji",
+      "type": "deity",
+      "label": "南極",
+      "aliases": ["南極", "南极", "南極元君", "南極長生", "長生大帝"],
+      "shortDef": "南极长生之神格，主延寿注生，常与北斗司命对举。",
+      "seedEdges": [{ "to": "nandou", "type": "related_to" }]
+    },
+    {
+      "id": "beiji",
+      "type": "deity",
+      "label": "北極大帝",
+      "aliases": ["北極大帝", "北极大帝"],
+      "shortDef": "北极星帝的一种称号，神谱中或与紫微、真武系统交涉，此处单独立目以免与紫微混名。",
+      "seedEdges": [{ "to": "ziwei", "type": "related_to" }]
+    },
+    {
+      "id": "huanglaojun",
+      "type": "deity",
+      "label": "中央黃老君",
+      "aliases": ["中央黃老君", "中央黄老君", "黃老君"],
+      "shortDef": "上清存思系统中的中央老君，与太上老君不是同一神格，不得并作一员。",
+      "seedEdges": [{ "to": "shangqing", "type": "related_to" }]
+    },
+    {
+      "id": "shangyuan",
+      "type": "deity",
+      "label": "上元夫人",
+      "aliases": ["上元夫人"],
+      "shortDef": "上清仙真中的女仙，传经授符传说多见，与南岳魏夫人系统相邻。",
+      "seedEdges": [{ "to": "weihuacun", "type": "related_to" }]
+    },
+    {
       "id": "laozi",
       "type": "person",
       "label": "老子",
@@ -651,9 +750,20 @@
       "id": "huangdi",
       "type": "person",
       "label": "黃帝",
-      "aliases": ["黃帝", "黄帝", "軒轅", "轩辕"],
+      "aliases": ["黃帝", "黄帝", "軒轅", "轩辕", "黃帝君"],
       "shortDef": "上古圣王的仙道化身，丹经、医经与多种道书托名问道于黄帝。",
       "seedEdges": [{ "to": "waidan", "type": "related_to" }]
+    },
+    {
+      "id": "yinxie",
+      "type": "person",
+      "label": "尹喜",
+      "aliases": ["尹喜", "文始先生", "關尹", "关尹", "尹真人"],
+      "shortDef": "传说函谷关令，请老子著书，后世文始一系与楼观传统多托其名。",
+      "seedEdges": [
+        { "to": "laozi", "type": "related_to" },
+        { "to": "zhongnanshan", "type": "related_to" }
+      ]
     },
     {
       "id": "zhuangzi",

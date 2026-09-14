@@ -185,3 +185,56 @@ export function extractRelationProposals(
   }
   return out;
 }
+
+/** 注入用：脚本接 getProvider().chat，单测用假函数，不绑密钥 */
+export type ProposalLlmChat = (prompt: string) => Promise<string>;
+
+const LLM_CONFIDENCE = 0.65;
+
+function parseLlmAccepts(raw: string, n: number): boolean[] | null {
+  const start = raw.indexOf('[');
+  const end = raw.lastIndexOf(']');
+  if (start < 0 || end <= start) return null;
+  try {
+    const parsed = JSON.parse(raw.slice(start, end + 1)) as Array<{ i?: number; accept?: boolean }>;
+    if (!Array.isArray(parsed) || parsed.length !== n) return null;
+    return parsed.map(row => row.accept === true);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * 把规则提案交给模型复核。接受的改为 source=llm、置信度仍低于待考线；
+ * 拒绝的从提案里拿掉（共现边仍在产物里）。解析失败则原样返回，不冒充 llm。
+ */
+export async function reviewProposalsWithLlm(
+  proposals: GraphProposalEdge[],
+  nodes: Array<{ id: string; label: string; type: string }>,
+  chat: ProposalLlmChat,
+): Promise<GraphProposalEdge[]> {
+  if (proposals.length === 0) return proposals;
+  const nodeById = new Map(nodes.map(n => [n.id, n]));
+  const lines = proposals.map((p, i) => {
+    const a = nodeById.get(p.from);
+    const b = nodeById.get(p.to);
+    return `${i + 1}. ${a?.label ?? p.from} → ${b?.label ?? p.to}`;
+  });
+  const prompt = [
+    '你是道教文献助手。下列是从共现抽出的待审「相关」关系。',
+    '只接受教义、科仪或丹法上确实相关的；仅因共用「天尊」「三」等字则拒绝。',
+    '只输出 JSON 数组，长度必须与条目数相同，元素形如 {"i":1,"accept":true}。不要解释。',
+    '',
+    ...lines,
+  ].join('\n');
+
+  const raw = await chat(prompt);
+  const accepts = parseLlmAccepts(raw, proposals.length);
+  if (!accepts) return proposals;
+  const kept: GraphProposalEdge[] = [];
+  for (let i = 0; i < proposals.length; i++) {
+    if (!accepts[i]) continue;
+    kept.push({ ...proposals[i], source: 'llm', confidence: LLM_CONFIDENCE });
+  }
+  return kept;
+}

@@ -24,6 +24,7 @@ const parents = [
   { id: 'place:xiyue', type: 'place', label: '西嶽', aliases: ['華山'] },
   { id: 'deity:taiwei', type: 'deity', label: '太微帝君', aliases: ['太微'] },
   { id: 'deity:nandou', type: 'deity', label: '南斗', aliases: ['南斗六司'] },
+  { id: 'deity:qingdi', type: 'deity', label: '青帝', aliases: ['青帝君'] },
   { id: 'concept:dansha', type: 'concept', label: '丹砂' },
 ];
 
@@ -86,6 +87,7 @@ test('太微前缀、南斗中缀、丹砂下位、衡山约定后缀', () => {
   assert.equal(inferTaxonomyLink({ term: '南斗六司星君', type: 'deity' }, parents)?.parentId, 'deity:nandou');
   assert.equal(inferTaxonomyLink({ term: '伏火丹砂', type: 'concept' }, parents)?.parentId, 'concept:dansha');
   assert.equal(inferTaxonomyLink({ term: '祝融衡山', type: 'place' }, parents)?.parentId, 'place:nanyue');
+  assert.equal(inferTaxonomyLink({ term: '東方青帝君', type: 'deity' }, parents)?.parentId, 'deity:qingdi');
 });
 
 test('每个上位截断子女数量', () => {

@@ -44,15 +44,17 @@ export default function GraphReviewClient({ items }: { items: GraphReviewItem[] 
   const [saving, setSaving] = useState<string | null>(null);
   const [error, setError] = useState('');
 
-  const save = async (key: string, decision: GraphEdgeDecision | null) => {
-    setSaving(key);
+  const save = async (target: string | string[], decision: GraphEdgeDecision | null) => {
+    const keys = Array.isArray(target) ? target : [target];
+    if (keys.length === 0) return;
+    setSaving(Array.isArray(target) ? 'batch' : keys[0]);
     setError('');
     try {
       const res = await fetch('/api/review/graph', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          key,
+          keys,
           decision,
           remove: decision === null,
         }),
@@ -61,13 +63,19 @@ export default function GraphReviewClient({ items }: { items: GraphReviewItem[] 
         const data = await res.json().catch(() => ({}));
         throw new Error(data.error || `保存失败（${res.status}）`);
       }
-      setDecisions(prev => ({ ...prev, [key]: decision }));
+      setDecisions(prev => {
+        const next = { ...prev };
+        for (const key of keys) next[key] = decision;
+        return next;
+      });
     } catch (e) {
       setError(e instanceof Error ? e.message : '保存失败');
     } finally {
       setSaving(null);
     }
   };
+
+  const pendingKeys = items.filter(it => (decisions[it.key] ?? it.decision) == null).map(it => it.key);
 
   if (items.length === 0) {
     return <p className="text-sm text-[var(--muted)] py-8">这一栏没有待处理的关系。</p>;
@@ -77,6 +85,27 @@ export default function GraphReviewClient({ items }: { items: GraphReviewItem[] 
     <div className="space-y-4">
       {error && (
         <p className="text-xs text-[var(--cinnabar)] bg-[var(--card)] border border-[var(--border)] rounded px-3 py-2">{error}</p>
+      )}
+
+      {pendingKeys.length > 1 && (
+        <div className="flex flex-wrap gap-2 text-xs">
+          <button
+            type="button"
+            onClick={() => save(pendingKeys, 'confirm')}
+            disabled={saving !== null}
+            className="px-2.5 py-1 rounded border border-[var(--accent)] text-[var(--accent)] hover:bg-[var(--card-hover)] disabled:opacity-40"
+          >
+            确认本页未审 {pendingKeys.length} 条
+          </button>
+          <button
+            type="button"
+            onClick={() => save(pendingKeys, 'reject')}
+            disabled={saving !== null}
+            className="px-2.5 py-1 rounded border border-[var(--border)] text-[var(--muted)] hover:text-[var(--cinnabar)] disabled:opacity-40"
+          >
+            否决本页未审
+          </button>
+        </div>
       )}
 
       {items.map(item => {
