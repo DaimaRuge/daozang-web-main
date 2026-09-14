@@ -115,6 +115,11 @@ export function restoredCinnabarPath(part: string, file: string): string {
   return path.join(RESTORED_ROOT, part, `${restoredStem(file)}.cinnabar.png`);
 }
 
+export function webCinnabarDiskPath(part: string, file: string): string {
+  const name = file.toLowerCase().endsWith('.cinnabar.webp') ? file : webCinnabarFile(file);
+  return path.join(DATA_ROOT, 'web', part, name);
+}
+
 export function restoredJpegPath(part: string, file: string): string {
   return path.join(RESTORED_ROOT, part, `${restoredStem(file)}.jpg`);
 }
@@ -165,9 +170,11 @@ export function resolveDaozangImageFile(
       ? originalImagePath(part, file)
       : kind === 'ink'
         ? restoredInkPath(part, file)
-        : kind === 'cinnabar'
-          ? restoredCinnabarPath(part, file)
-          : restoredImagePath(part, file);
+    : kind === 'cinnabar'
+        ? file.toLowerCase().endsWith('.webp')
+          ? webCinnabarDiskPath(part, file)
+          : restoredCinnabarPath(part, file)
+        : restoredImagePath(part, file);
   if (!exists(absPath)) return null;
   return { absPath, kind };
 }

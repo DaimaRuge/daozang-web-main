@@ -6,8 +6,11 @@ import fs from 'fs';
 import path from 'path';
 import { restoredStem } from './daozang-image-url';
 
-export const WEB_CINNABAR_LONG_EDGE = 512;
-export const WEB_CINNABAR_QUALITY = 55;
+/** 母版是 1024 边透明 PNG；网页按阅读区缩放，不必保留那么大。 */
+export const WEB_CINNABAR_LONG_EDGE = 384;
+export const WEB_CINNABAR_QUALITY = 45;
+export const WEB_CINNABAR_ALPHA_QUALITY = 50;
+export const WEB_CINNABAR_EFFORT = 6;
 
 export interface DaozangWebImageManifest {
   version: 1;

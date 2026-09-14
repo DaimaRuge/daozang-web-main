@@ -17,6 +17,7 @@ import {
   originalImagePath,
   resolveDaozangImageFile,
   restoredCinnabarPath,
+  webCinnabarDiskPath,
   restoredImagePath,
   restoredInkPath,
   stemFilename,
@@ -120,6 +121,13 @@ describe('resolveDaozangImageFile', () => {
     assert.equal(resolveDaozangImageFile(part, 'sample.cinnabar.png', exists)?.kind, 'cinnabar');
     assert.equal(resolveDaozangImageFile(part, 'sample.png', exists)?.kind, 'restored');
   });
+
+  test('请求 cinnabar.webp 走网页压缩目录，不回落到高清 PNG', () => {
+    const webp = webCinnabarDiskPath(part, 'sample.cinnabar.webp');
+    const hit = resolveDaozangImageFile(part, 'sample.cinnabar.webp', p => path.normalize(p) === path.normalize(webp));
+    assert.equal(hit?.kind, 'cinnabar');
+    assert.equal(path.normalize(hit?.absPath ?? ''), path.normalize(webp));
+  });
 });
 
 describe('injectDaozangImages', () => {
@@ -163,7 +171,7 @@ describe('injectDaozangImages', () => {
     assert.equal(image?.originalSrc, image?.content);
   });
 
-  test('有复原时正文用 PNG，originalSrc 仍指向原扫描 jpg', () => {
+  test('有网页朱砂时正文用 webp，originalSrc 仍指向原扫描 jpg', () => {
     const source = '太上秘法鎮宅靈符\n經名：測試\n安鎮東維青華丈人符\n其後正文。';
     const parsed = parseText(source, 'book-fu', '太上秘法鎮宅靈符');
     const at = source.indexOf('安鎮東維青華丈人符');
@@ -192,11 +200,11 @@ describe('injectDaozangImages', () => {
     const image = injected.blocks.find(b => b.type === 'image');
     const caption = injected.blocks.find(b => b.type === 'image-caption');
     assert.equal(image?.parser, 'daozang-restored');
-    assert.match(image?.content ?? '', /\.cinnabar\.png$/);
+    assert.match(image?.content ?? '', /\.cinnabar\.webp$/);
     assert.match(image?.originalSrc ?? '', /image086\.jpg$/);
     assert.match(image?.inkSrc ?? '', /\.ink\.png$/);
-    assert.match(image?.cinnabarSrc ?? '', /\.cinnabar\.png$/);
-    assert.match(caption?.content ?? '', /对照原扫描/);
+    assert.match(image?.cinnabarSrc ?? '', /\.cinnabar\.webp$/);
+    assert.match(caption?.content ?? '', /网页压缩复原/);
   });
 });
 

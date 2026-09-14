@@ -26,7 +26,8 @@ describe('daozangObjectKey / daozangPublicUrl', () => {
   test('未配置 CDN 时退回站内静态路径', () => {
     assert.equal(daozangPublicUrl('洞真部', 'a.jpg', ''), daozangImageUrl('洞真部', 'a.jpg'));
     assert.equal(daozangImageUrl('洞真部', 'a.jpg'), '/daozang-images/%E6%B4%9E%E7%9C%9F%E9%83%A8/a.jpg');
-    assert.equal(daozangImageUrl('洞真部', 'a.cinnabar.webp'), '/api/daozang-images/%E6%B4%9E%E7%9C%9F%E9%83%A8/a.cinnabar.webp');
+    assert.equal(daozangImageUrl('洞真部', 'a.cinnabar.webp'), '/daozang-images/%E6%B4%9E%E7%9C%9F%E9%83%A8/a.cinnabar.webp');
+    assert.equal(daozangImageUrl('洞真部', 'a.ink.png'), '/api/daozang-images/%E6%B4%9E%E7%9C%9F%E9%83%A8/a.ink.png');
   });
 });
 

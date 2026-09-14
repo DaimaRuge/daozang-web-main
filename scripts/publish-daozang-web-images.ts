@@ -12,6 +12,8 @@ import { put } from '@vercel/blob';
 import { daozangObjectKey } from '../lib/daozang-image-url';
 import { imagesDataRoot } from '../lib/daozang-images';
 import {
+  WEB_CINNABAR_ALPHA_QUALITY,
+  WEB_CINNABAR_EFFORT,
   WEB_CINNABAR_LONG_EDGE,
   WEB_CINNABAR_QUALITY,
   webCinnabarFile,
@@ -21,9 +23,10 @@ import {
 const skipBuild = process.argv.includes('--skip-build');
 const skipUpload = process.argv.includes('--skip-upload');
 const scansOnly = process.argv.includes('--scans-only');
+const webOnly = process.argv.includes('--web-only');
 const limit = Math.max(0, parseInt(flagValue('--limit') ?? '0', 10) || 0);
 const concurrency = Math.max(1, parseInt(flagValue('--concurrency') ?? '8', 10) || 8);
-const maxWebMb = Math.max(0, parseInt(flagValue('--max-web-mb') ?? '700', 10) || 700);
+const maxWebMb = Math.max(0, parseInt(flagValue('--max-web-mb') ?? '600', 10) || 600);
 
 function flagValue(name: string): string | undefined {
   const eq = process.argv.find(a => a.startsWith(`${name}=`));
@@ -114,7 +117,12 @@ async function buildWebp(jobs: { dest: string; src: string }[]): Promise<number>
         withoutEnlargement: true,
         kernel: 'lanczos3',
       })
-      .webp({ quality: WEB_CINNABAR_QUALITY, alphaQuality: 80, effort: 4 })
+      .webp({
+        quality: WEB_CINNABAR_QUALITY,
+        alphaQuality: WEB_CINNABAR_ALPHA_QUALITY,
+        effort: WEB_CINNABAR_EFFORT,
+        smartSubsample: true,
+      })
       .toFile(job.dest);
     done += 1;
     if (done % 400 === 0) console.log(`压缩 ${done}/${jobs.length}`);
@@ -137,7 +145,7 @@ async function main() {
   loadEnvLocal();
   const cinnabarJobs = walkCinnabarJobs();
   const scanJobs = walkScanJobs();
-  console.log(`扫描 ${scanJobs.length} 朱砂母版 ${cinnabarJobs.length} skipBuild=${skipBuild} skipUpload=${skipUpload} scansOnly=${scansOnly}`);
+  console.log(`扫描 ${scanJobs.length} 朱砂母版 ${cinnabarJobs.length} skipBuild=${skipBuild} skipUpload=${skipUpload} scansOnly=${scansOnly} webOnly=${webOnly}`);
 
   if (!skipBuild && !scansOnly && cinnabarJobs.length) {
     const n = await buildWebp(cinnabarJobs);
@@ -145,7 +153,7 @@ async function main() {
   }
 
   if (skipUpload) {
-    writeManifest(cinnabarJobs);
+    writeManifest(cinnabarJobs.map(({ part, file }) => ({ part, file })));
     return;
   }
   if (!process.env.BLOB_READ_WRITE_TOKEN) {
@@ -153,14 +161,16 @@ async function main() {
   }
 
   let uploaded = 0;
-  await mapPool(scanJobs, concurrency, async job => {
-    const ext = path.extname(job.file).toLowerCase();
-    const type = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
-    await uploadFile(daozangObjectKey(job.part, job.file), job.src, type);
-    uploaded += 1;
-    if (uploaded % 400 === 0) console.log(`上传原扫描 ${uploaded}/${scanJobs.length}`);
-  });
-  console.log(`原扫描已传 ${uploaded}`);
+  if (!webOnly) {
+    await mapPool(scanJobs, concurrency, async job => {
+      const ext = path.extname(job.file).toLowerCase();
+      const type = ext === '.png' ? 'image/png' : ext === '.webp' ? 'image/webp' : 'image/jpeg';
+      await uploadFile(daozangObjectKey(job.part, job.file), job.src, type);
+      uploaded += 1;
+      if (uploaded % 400 === 0) console.log(`上传原扫描 ${uploaded}/${scanJobs.length}`);
+    });
+    console.log(`原扫描已传 ${uploaded}`);
+  }
 
   if (scansOnly) {
     writeManifest([]);
@@ -194,7 +204,7 @@ function writeManifest(items: { part: string; file: string }[]): void {
     generatedAt: new Date().toISOString(),
     longEdge: WEB_CINNABAR_LONG_EDGE,
     stats: { webCinnabar: items.length },
-    items,
+    items: items.map(({ part, file }) => ({ part, file })),
   };
   const manifestPath = path.join(process.cwd(), 'data', 'daozang-web-images.json');
   fs.writeFileSync(manifestPath, JSON.stringify(manifest));

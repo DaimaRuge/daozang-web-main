@@ -8,19 +8,23 @@ import { withPayload } from '@payloadcms/next/withPayload';
 const mediaHost = process.env.NEXT_PUBLIC_MEDIA_BASE_URL;
 
 function mediaRemotePatterns(): NonNullable<NonNullable<NextConfig['images']>['remotePatterns']> {
-  if (!mediaHost) return [];
+  const githubCdn: NonNullable<NonNullable<NextConfig['images']>['remotePatterns']> = [
+    { protocol: 'https', hostname: 'cdn.jsdelivr.net', pathname: '/**' },
+    { protocol: 'https', hostname: 'raw.githubusercontent.com', pathname: '/**' },
+  ];
+  if (!mediaHost) return githubCdn;
   try {
     const url = new URL(mediaHost);
     const protocol = url.protocol.replace(':', '') as 'http' | 'https';
-    if (protocol !== 'http' && protocol !== 'https') return [];
+    if (protocol !== 'http' && protocol !== 'https') return githubCdn;
     return [{
       protocol,
       hostname: url.hostname,
       ...(url.port ? { port: url.port } : {}),
       pathname: '/**',
-    }];
+    }, ...githubCdn];
   } catch {
-    return [];
+    return githubCdn;
   }
 }
 

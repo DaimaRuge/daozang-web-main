@@ -1,3 +1,5 @@
+# 几万张图只进 GitHub；Vercel 构建包带不了，线上走 Blob CDN。
+public/daozang-images/
 data/daozang-text/
 data/daozang-text-new/
 data/daozang-text-utf8/
