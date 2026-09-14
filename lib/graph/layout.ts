@@ -132,7 +132,7 @@ export function computeLayout(view: GraphView, options: LayoutOptions = {}): Gra
     displayLabel: truncateLabel(view.center.label, centerMaxChars),
   };
 
-  // 按比例把画布名额分给各分组，保证每组至少有 1 个（否则某类关系会整组消失）
+  // 按比例把画布名额分给各分组；顺序靠前的组优先保底 1 个
   const groups = view.groups.filter(g => g.items.length > 0);
   const quota = allocateQuota(groups, maxNodes);
 
@@ -315,14 +315,14 @@ function resolveLabelCollisions(
 }
 
 /**
- * 名额分配：先给每组 1 个保底，剩余按条目数比例分配。
- * 这样「只有 1 条的目录关系」不会被「60 条的提及关系」挤掉 ——
- * 而恰恰是那条目录关系最可靠、最该出现在图上。
+ * 名额分配：先按分组顺序各给 1 个保底（可靠关系在前），剩余按条目数比例分配。
+ * 这样「只有 1 条的目录关系」不会被「60 条的提及关系」挤掉。
+ * 分组数多于 maxNodes 时，靠后的组拿不到名额，总节点数仍不超过上限。
  */
 function allocateQuota(groups: RelationGroup[], maxNodes: number): number[] {
   if (groups.length === 0) return [];
   const quota = groups.map(() => 0);
-  let remaining = Math.max(maxNodes, groups.length);
+  let remaining = Math.max(0, maxNodes);
 
   for (let i = 0; i < groups.length && remaining > 0; i++) {
     quota[i] = 1;
@@ -331,15 +331,25 @@ function allocateQuota(groups: RelationGroup[], maxNodes: number): number[] {
 
   const hungry = groups.map((g, i) => ({ i, want: g.items.length - quota[i] }));
   const totalWant = hungry.reduce((a, b) => a + Math.max(0, b.want), 0);
-  if (totalWant > 0) {
+  if (totalWant > 0 && remaining > 0) {
+    const budget = remaining;
     for (const h of hungry) {
       if (remaining <= 0 || h.want <= 0) continue;
-      const share = Math.min(h.want, Math.round((h.want / totalWant) * remaining));
+      const share = Math.min(h.want, remaining, Math.round((h.want / totalWant) * budget));
       quota[h.i] += share;
+      remaining -= share;
     }
   }
 
-  // 修正取整误差，且不超过各组实际条目数
+  for (const h of hungry) {
+    if (remaining <= 0) break;
+    const room = groups[h.i].items.length - quota[h.i];
+    if (room <= 0) continue;
+    const add = Math.min(room, remaining);
+    quota[h.i] += add;
+    remaining -= add;
+  }
+
   for (let i = 0; i < quota.length; i++) {
     quota[i] = Math.min(quota[i], groups[i].items.length);
   }

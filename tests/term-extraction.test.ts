@@ -133,11 +133,11 @@ test('逻辑回归能分开线性可分样本，且 L2 抑制权重爆炸', () =
   const X: number[][] = [];
   const y: number[] = [];
   for (let i = 0; i < 80; i++) {
-    X.push([3 + Math.random(), 0.1, 2, 0.2, 3, 0.1, 0.1, 2, 0.8, 0.1, 1]);
+    X.push([3 + i / 80, 0.1, 2, 0.2, 3, 0.1, 0.1, 2, 0.8, 0.1, 1]);
     y.push(1);
   }
   for (let i = 0; i < 80; i++) {
-    X.push([0.5 + Math.random() * 0.3, -1, 0.4, 2, 0.5, 0.8, 0.9, 5, 0.05, 0.9, 0]);
+    X.push([0.5 + (i / 80) * 0.3, -1, 0.4, 2, 0.5, 0.8, 0.9, 5, 0.05, 0.9, 0]);
     y.push(0);
   }
   const model = fitLogistic(X, y, { epochs: 40, learningRate: 0.1, l2: 0.08, seed: 1 });

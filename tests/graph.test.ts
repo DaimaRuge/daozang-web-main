@@ -167,6 +167,83 @@ test('布局：每个分组都分到扇区标题', () => {
   assert.ok(layout.sectors.some(s => s.label === '见于典籍'));
 });
 
+test('布局：分组数大于上限时总节点仍不超过 maxNodes，且靠前的可靠组保留', () => {
+  const center = { id: 'concept:x', type: 'concept' as const, label: '中心' };
+  const groups: GraphView['groups'] = [
+    {
+      type: 'part_of',
+      label: '所属部类',
+      total: 1,
+      items: [
+        {
+          node: { id: 'category:正一部', type: 'category' as const, label: '正一部' },
+          edge: {
+            from: 'concept:x',
+            to: 'category:正一部',
+            type: 'part_of',
+            source: 'catalog',
+            confidence: 0.98,
+          },
+          direction: 'out',
+        },
+      ],
+    },
+  ];
+  for (let i = 0; i < 14; i++) {
+    groups.push({
+      type: 'has_tag',
+      label: `标签${i}`,
+      total: 1,
+      items: [
+        {
+          node: { id: `tag:t${i}`, type: 'tag' as const, label: `标${i}` },
+          edge: {
+            from: 'concept:x',
+            to: `tag:t${i}`,
+            type: 'has_tag',
+            source: 'catalog',
+            confidence: 0.9,
+          },
+          direction: 'out',
+        },
+      ],
+    });
+  }
+  const layout = computeLayout({ center, synthetic: false, groups }, { maxNodes: 8 });
+  assert.ok(layout.nodes.length <= 8, `实际 ${layout.nodes.length}`);
+  assert.ok(layout.nodes.some(n => n.node.id === 'category:正一部'));
+});
+
+test('布局：比例分配取整不得突破剩余名额', () => {
+  const center = { id: 'concept:x', type: 'concept' as const, label: '中心' };
+  const mkGroup = (label: string, prefix: string): GraphView['groups'][number] => ({
+    type: 'mentioned_in',
+    label,
+    total: 20,
+    items: Array.from({ length: 20 }, (_, i) => ({
+      node: { id: `work:${prefix}${i}`, type: 'work' as const, label: `${label}${i}` },
+      edge: {
+        from: 'concept:x',
+        to: `work:${prefix}${i}`,
+        type: 'mentioned_in',
+        source: 'mention',
+        confidence: 0.9,
+      },
+      direction: 'out' as const,
+    })),
+  });
+  const layout = computeLayout(
+    {
+      center,
+      synthetic: false,
+      groups: [mkGroup('甲', 'a'), mkGroup('乙', 'b'), mkGroup('丙', 'c')],
+    },
+    { maxNodes: 5 },
+  );
+  assert.ok(layout.nodes.length <= 5, `实际 ${layout.nodes.length}`);
+  assert.equal(layout.sectors.length, 3, '三组都应保底出现');
+});
+
 test('画布标签：剥掉文件名残留的丛集前缀与朝代作者后缀', () => {
   const node = {
     id: 'work:x',
@@ -319,6 +396,12 @@ test('查询：词表未命中的检索词走回退链路仍有关系可看', sk
   assert.equal(view!.synthetic, true, '应标记为合成中心点');
   assert.ok(view!.groups.length > 0, '应至少有一组关系');
   assert.ok(view!.note, '合成视图必须带说明，不能让用户误认为是既有实体');
+  const hits = view!.groups.find(g => g.label === '检索命中典籍');
+  assert.ok(hits && hits.items.length > 0, '应有检索命中典籍');
+  assert.ok(
+    hits.items.every(i => i.edge.source === 'catalog'),
+    '目录检索命中不得标成原文提及',
+  );
 });
 
 test('查询：典籍中心点带关联文献与本书涉及的本体', skipReason, () => {

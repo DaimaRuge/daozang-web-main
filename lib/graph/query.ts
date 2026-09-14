@@ -437,8 +437,8 @@ export function relatedByKeyword(query: string, groupLimit = DEFAULT_GROUP_LIMIT
         from: center.id,
         to: workNodeId,
         type: 'mentioned_in',
-        source: 'mention',
-        // 由检索命中推导，非图谱既有边，置信度如实标低
+        source: 'catalog',
+        // 由书名检索命中推导，不是原文扫描，置信度如实标低
         confidence: 0.6,
       },
       direction: 'out',
