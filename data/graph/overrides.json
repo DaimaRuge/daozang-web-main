@@ -27956,6 +27956,334 @@
     "concept:auto-唐太宗|cooccurs_with|concept:auto-掌天下道教事": {
       "decision": "reject",
       "reviewedAt": 1789347474582
+    },
+    "concept:sandong|cooccurs_with|ritual:zhaijiao": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|ritual:liandu": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|concept:shenzhou": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-素車白馬": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:falu|cooccurs_with|concept:sandong": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:fulu|cooccurs_with|concept:sandong": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:jiaotan|cooccurs_with|concept:sandong": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|sect:lingbao": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-大洞|cooccurs_with|concept:sandong": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|deity:shifang": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-洞玄|cooccurs_with|concept:sandong": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|concept:sanqing": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|deity:yuanshi": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|ritual:duren": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|deity:taiyi": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|ritual:auto-法事": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|ritual:dengyi": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|deity:xuhuang": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-金闕化身天尊": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-靜老天尊": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-十方靈寶天尊": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-開通道路": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|concept:zhangzou": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|ritual:shoulu": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-都星君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-虹蜺": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:sandong|cooccurs_with|person:auto-太極真人": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-洞玄靈寶|cooccurs_with|concept:sandong": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-三境天尊": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-衛房聖母": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-捲簾|cooccurs_with|concept:auto-提魂攝魄": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-梯航": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-解冤釋結": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-青玄救苦": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-正一靜應真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-杜廣成": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-溟涬大梵": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-五鍊生尸|cooccurs_with|concept:auto-提魂攝魄": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-三途五苦|cooccurs_with|concept:auto-提魂攝魄": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-東華青宮": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-泰玄都省": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-籙簡文": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-靈寶大法": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-五嶽真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-尋聲救苦天尊": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-神功妙濟真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-舉天尊": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-逍遙快樂天尊": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-金母元君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|person:auto-右玄真人": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-召魂旛|cooccurs_with|concept:auto-提魂攝魄": {
+      "decision": "confirm",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-城隍里社|cooccurs_with|concept:auto-提魂攝魄": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-赫奕仙曹": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-齋官上香": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-寶華圓滿天尊": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-宿生今世|cooccurs_with|concept:auto-提魂攝魄": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-追魂攝魄": {
+      "decision": "confirm",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-黃籙院": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-丈人真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-大法師真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-太清大帝": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-月孛星君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-神太一真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|place:auto-大鐵圍山": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|place:auto-山川嶽": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-囉哩|cooccurs_with|concept:auto-提魂攝魄": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-風雷雨部": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-上相真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-五星真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-司真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-應孚佑真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-洞陰大帝": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-濟真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-長生大帝君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-院使真君": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|place:auto-天海嶽": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|place:auto-鐵圍山": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-大聖元始天尊": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-浣濯": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-襪臈": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|deity:auto-執法真宰": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
+    },
+    "concept:auto-提魂攝魄|cooccurs_with|concept:auto-設清醮": {
+      "decision": "reject",
+      "reviewedAt": 1789409802215
     }
   }
 }

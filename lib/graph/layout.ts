@@ -253,10 +253,11 @@ function resolveLabelCollisions(
   width: number,
   height: number,
 ): void {
-  // 候选偏移按字号成比例（字号变大时避让幅度同步变大），上下交替、幅度递增
+  // 候选偏移按字号成比例（字号变大时避让幅度同步变大），上下交替、幅度递增。
+  // 洞天福地一类中圈节点变密时，短标签截不断，需要比 5 档更深的车道才能越过邻圆。
   const step = labelFontSize * 1.28;
   const candidates = [0];
-  for (let k = 1; k <= 5; k++) {
+  for (let k = 1; k <= 8; k++) {
     candidates.push(step * k, -step * (k + 0.9));
   }
 
