@@ -29,7 +29,7 @@ export interface TaxonomyLink {
 }
 
 /** 动词/介词粘在术语前：見老君、修黃籙齋、聞天尊，不是下位名 */
-const NOISE_PREFIX = /^[見聞時入建設立尋告封履申登召諸修普]/;
+const NOISE_PREFIX = /^[見聞時入建設立尋告封履申登召諸修普傳]/;
 
 /**
  * 正名对不上、但后缀几乎不会歧义的挂靠。
@@ -39,6 +39,11 @@ const EXTRA_SUFFIX: Array<{ suffix: string; parentLabel: string; types?: string[
   { suffix: '救苦天尊', parentLabel: '太乙救苦天尊', types: ['deity'] },
   { suffix: '洞天', parentLabel: '洞天福地', types: ['place', 'concept'] },
   { suffix: '福地', parentLabel: '洞天福地', types: ['place', 'concept'] },
+  { suffix: '衡山', parentLabel: '南嶽', types: ['place'] },
+  { suffix: '華山', parentLabel: '西嶽', types: ['place'] },
+  { suffix: '嵩山', parentLabel: '中嶽', types: ['place'] },
+  { suffix: '恒山', parentLabel: '北嶽', types: ['place'] },
+  { suffix: '恆山', parentLabel: '北嶽', types: ['place'] },
 ];
 
 function typesCompatible(child: string, parent: string): boolean {

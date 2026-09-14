@@ -377,14 +377,14 @@ test('查询：构词归属把太上元始天尊挂到元始天尊，且不把�
   );
 });
 
-test('查询：规则抽取的待审边在运行时可见', skipReason, () => {
+test('查询：丹砂为策展概念并连到外丹', skipReason, () => {
   const dansha = resolveQuery('丹砂');
-  assert.ok(dansha);
+  assert.ok(dansha && dansha.origin === 'curated' && dansha.shortDef);
   const view = expandNode(dansha.id);
   const related = view?.groups.find(g => g.type === 'related_to');
   assert.ok(
-    related?.items.some(i => i.node.label === '外丹' && i.edge.source === 'extract'),
-    '丹砂应有待审的「外丹」抽取边',
+    related?.items.some(i => i.node.label === '外丹' && i.edge.source === 'gazetteer'),
+    '丹砂应有词表策展的「外丹」边',
   );
 });
 
@@ -399,6 +399,19 @@ test('查询：紫微收纳北極紫微大帝；許真君为策展神祇', skipR
   );
   const xu = resolveQuery('许真君');
   assert.ok(xu && xu.origin === 'curated' && xu.shortDef);
+});
+
+test('查询：别名并入策展；五嶽与太微可解析', skipReason, () => {
+  const tao = resolveQuery('陶隐居');
+  assert.ok(tao && tao.origin === 'curated' && tao.label === '陶弘景');
+  const han = resolveQuery('汉天师');
+  assert.ok(han && han.label === '張道陵');
+  const wuyue = resolveQuery('五岳');
+  assert.ok(wuyue && wuyue.origin === 'curated' && wuyue.type === 'place');
+  const taiwei = resolveQuery('太微天帝君');
+  assert.ok(taiwei && (taiwei.label === '太微帝君' || taiwei.label.includes('太微')));
+  const huang = resolveQuery('黄帝');
+  assert.ok(huang && huang.origin === 'curated' && huang.type === 'person');
 });
 
 test('查询：概念图目录按类型开架，不含典籍与题署人物', skipReason, () => {

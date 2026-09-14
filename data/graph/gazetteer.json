@@ -112,6 +112,28 @@
       "shortDef": "以炉火烧炼丹砂、铅汞等矿物药求长生的技术传统，唐以前盛行，后渐让位于内丹。"
     },
     {
+      "id": "dansha",
+      "type": "concept",
+      "label": "丹砂",
+      "aliases": ["丹砂", "丹沙", "硃砂", "朱砂"],
+      "shortDef": "外丹最常用的矿物药，亦被内丹借为精气神凝炼的象征。词表释义，非炼药指南。",
+      "seedEdges": [
+        { "to": "waidan", "type": "related_to" },
+        { "to": "jindan", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "huangya",
+      "type": "concept",
+      "label": "黃芽",
+      "aliases": ["黃芽", "黄芽"],
+      "shortDef": "丹道文献中的药物隐语，外丹多指铅汞初生之芽，内丹借喻阳气初萌。词表释义。",
+      "seedEdges": [
+        { "to": "waidan", "type": "related_to" },
+        { "to": "jindan", "type": "related_to" }
+      ]
+    },
+    {
       "id": "jindan",
       "type": "concept",
       "label": "金丹",
@@ -552,11 +574,86 @@
       "seedEdges": [{ "to": "jingming", "type": "related_to" }]
     },
     {
+      "id": "donghua",
+      "type": "deity",
+      "label": "東華帝君",
+      "aliases": ["東華帝君", "东华帝君", "東華", "東王公"],
+      "shortDef": "东方仙真之主，常与西王母对举；全真道亦奉为北宗第一祖。",
+      "seedEdges": [
+        { "to": "xiwangmu", "type": "related_to" },
+        { "to": "quanzhen", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "taiwei",
+      "type": "deity",
+      "label": "太微帝君",
+      "aliases": ["太微帝君", "太微天帝君", "太微"],
+      "shortDef": "太微垣的神格，上清存思与章奏系统中的星帝之一，常与紫微并称。",
+      "seedEdges": [{ "to": "ziwei", "type": "related_to" }]
+    },
+    {
+      "id": "fusang",
+      "type": "deity",
+      "label": "扶桑大帝",
+      "aliases": ["扶桑大帝", "水府扶桑大帝", "扶桑丹林大帝", "扶桑"],
+      "shortDef": "东方扶桑之神，主日出与水府，相关斋醮章奏多称水府扶桑。",
+      "seedEdges": [{ "to": "donghua", "type": "related_to" }]
+    },
+    {
+      "id": "nandou",
+      "type": "deity",
+      "label": "南斗",
+      "aliases": ["南斗", "南斗星君", "南斗六司", "六司星君"],
+      "shortDef": "南斗六星的神格，主延寿注生，常与北斗司命对举，灯仪甚多。",
+      "seedEdges": [{ "to": "beidou", "type": "related_to" }]
+    },
+    {
+      "id": "xuhuang",
+      "type": "deity",
+      "label": "虛皇天尊",
+      "aliases": ["虛皇天尊", "虚皇天尊", "虛皇", "太上虛皇"],
+      "shortDef": "灵宝与戒律文献中的说法之主之一，常居虚皇之位开演经戒。",
+      "seedEdges": [{ "to": "yuanshi", "type": "related_to" }]
+    },
+    {
+      "id": "haosheng",
+      "type": "deity",
+      "label": "好生度命天尊",
+      "aliases": ["好生度命天尊", "好生度命", "度命天尊"],
+      "shortDef": "灵宝度人系统中主好生与延命的天尊，相关经忏、宝诰常见。",
+      "seedEdges": [{ "to": "duren", "type": "related_to" }]
+    },
+    {
+      "id": "jinque",
+      "type": "deity",
+      "label": "金闕帝君",
+      "aliases": ["金闕帝君", "金阙帝君", "金闕"],
+      "shortDef": "金阙上的帝君神格，章奏与神谱中常与玉皇、东华并列。",
+      "seedEdges": [{ "to": "yuhuang", "type": "related_to" }]
+    },
+    {
+      "id": "siming",
+      "type": "deity",
+      "label": "司命真君",
+      "aliases": ["司命真君", "司命", "司命星君"],
+      "shortDef": "主人生死寿夭簿籍的神明，北斗与灶神系统中皆有司命之职。",
+      "seedEdges": [{ "to": "beidou", "type": "related_to" }]
+    },
+    {
       "id": "laozi",
       "type": "person",
       "label": "老子",
       "aliases": ["老子", "李耳", "老聃"],
       "shortDef": "《道德经》传统所归之作者，道家思想的奠基者，后被神格化为太上老君。"
+    },
+    {
+      "id": "huangdi",
+      "type": "person",
+      "label": "黃帝",
+      "aliases": ["黃帝", "黄帝", "軒轅", "轩辕"],
+      "shortDef": "上古圣王的仙道化身，丹经、医经与多种道书托名问道于黄帝。",
+      "seedEdges": [{ "to": "waidan", "type": "related_to" }]
     },
     {
       "id": "zhuangzi",
@@ -569,7 +666,7 @@
       "id": "zhangdaoling",
       "type": "person",
       "label": "張道陵",
-      "aliases": ["張道陵", "張陵", "張天師", "祖天師"],
+      "aliases": ["張道陵", "張陵", "張天師", "祖天師", "漢天師"],
       "shortDef": "东汉末创立盟威之道者，正一派奉为祖师，后世天师世系皆溯于此。"
     },
     {
@@ -583,7 +680,7 @@
       "id": "taohongjing",
       "type": "person",
       "label": "陶弘景",
-      "aliases": ["陶弘景", "華陽隱居", "貞白"],
+      "aliases": ["陶弘景", "華陽隱居", "陶隱居", "貞白"],
       "shortDef": "南朝上清宗师，编《真诰》、定神谱，奠定茅山传统。",
       "seedEdges": [{ "to": "maoshan", "type": "related_to" }]
     },
@@ -591,7 +688,7 @@
       "id": "luxiujing",
       "type": "person",
       "label": "陸修靜",
-      "aliases": ["陸修靜", "陆修静", "簡寂"],
+      "aliases": ["陸修靜", "陆修静", "簡寂", "陸先生"],
       "shortDef": "南朝道教改革者，整理灵宝经教、创制斋仪，并首倡三洞分部的经目体系。"
     },
     {
@@ -648,7 +745,7 @@
       "id": "wangchongyang",
       "type": "person",
       "label": "王重陽",
-      "aliases": ["王重陽", "王重阳", "重陽真人", "王嚞"],
+      "aliases": ["王重陽", "王重阳", "重陽真人", "重陽祖師", "王嚞"],
       "shortDef": "全真道创立者，主张三教合一与性命双修。"
     },
     {
@@ -662,7 +759,7 @@
       "id": "ludongbin",
       "type": "person",
       "label": "呂洞賓",
-      "aliases": ["呂洞賓", "吕洞宾", "純陽", "呂祖"],
+      "aliases": ["呂洞賓", "吕洞宾", "純陽", "呂祖", "呂真人"],
       "shortDef": "唐代传说仙人，宋以后成为丹道与民间信仰的核心人物，托名文献极多。"
     },
     {
@@ -747,7 +844,65 @@
       "type": "place",
       "label": "泰山",
       "aliases": ["泰山", "岱嶽", "東嶽山"],
-      "shortDef": "五岳之东岳，封禅与冥司信仰的重心。"
+      "shortDef": "五岳之东岳，封禅与冥司信仰的重心。",
+      "seedEdges": [{ "to": "wuyue", "type": "related_to" }]
+    },
+    {
+      "id": "wuyue",
+      "type": "place",
+      "label": "五嶽",
+      "aliases": ["五嶽", "五岳", "五嶽名山", "五嶽靈山"],
+      "shortDef": "东岳泰山、南岳衡山、西岳华山、北岳恒山、中岳嵩山的合称，道教洞天与祠祀的骨干地理。",
+      "seedEdges": [
+        { "to": "dongyue", "type": "related_to" },
+        { "to": "nanyue", "type": "related_to" },
+        { "to": "zhongyue", "type": "related_to" },
+        { "to": "xiyue", "type": "related_to" },
+        { "to": "beiyue", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "nanyue",
+      "type": "place",
+      "label": "南嶽",
+      "aliases": ["南嶽", "南岳", "衡山", "南嶽衡山"],
+      "shortDef": "五岳之南岳衡山，上清魏夫人传说与南岳道教传统所系。",
+      "seedEdges": [
+        { "to": "wuyue", "type": "related_to" },
+        { "to": "weihuacun", "type": "related_to" }
+      ]
+    },
+    {
+      "id": "zhongyue",
+      "type": "place",
+      "label": "中嶽",
+      "aliases": ["中嶽", "中岳", "嵩山", "中嶽嵩山", "嵩高山"],
+      "shortDef": "五岳之中岳嵩山，中原祠祀与隐修文献中的要地。",
+      "seedEdges": [{ "to": "wuyue", "type": "related_to" }]
+    },
+    {
+      "id": "xiyue",
+      "type": "place",
+      "label": "西嶽",
+      "aliases": ["西嶽", "西岳", "華山", "华山", "西嶽華山"],
+      "shortDef": "五岳之西岳华山，早期仙道与隐修传统的重要山岳。",
+      "seedEdges": [{ "to": "wuyue", "type": "related_to" }]
+    },
+    {
+      "id": "beiyue",
+      "type": "place",
+      "label": "北嶽",
+      "aliases": ["北嶽", "北岳", "恒山", "恆山", "北嶽恒山"],
+      "shortDef": "五岳之北岳恒山，北方镇山与相关祠祀所在。",
+      "seedEdges": [{ "to": "wuyue", "type": "related_to" }]
+    },
+    {
+      "id": "penglai",
+      "type": "place",
+      "label": "蓬萊",
+      "aliases": ["蓬萊", "蓬莱", "蓬萊山", "蓬島"],
+      "shortDef": "东方海上仙山，与方壶、瀛洲并称，仙境地理与寻仙传说的典型。",
+      "seedEdges": [{ "to": "kunlun", "type": "related_to" }]
     }
   ]
 }

@@ -1,24 +1,8 @@
 {
   "version": 1,
-  "generatedAt": "2026-09-13T05:31:51.339Z",
+  "generatedAt": "2026-09-14T00:06:21.425Z",
   "method": "cooccur-curated-auto-v1",
   "edges": [
-    {
-      "from": "concept:auto-丹砂",
-      "to": "concept:waidan",
-      "type": "related_to",
-      "source": "extract",
-      "confidence": 0.55,
-      "weight": 142
-    },
-    {
-      "from": "concept:auto-丹砂",
-      "to": "concept:neidan",
-      "type": "related_to",
-      "source": "extract",
-      "confidence": 0.55,
-      "weight": 102
-    },
     {
       "from": "concept:auto-雷電",
       "to": "concept:leifa",
@@ -44,6 +28,22 @@
       "weight": 70
     },
     {
+      "from": "concept:auto-黃婆",
+      "to": "concept:huangya",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 70
+    },
+    {
+      "from": "concept:auto-設醮",
+      "to": "ritual:zhaijiao",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 66
+    },
+    {
       "from": "concept:auto-喘息",
       "to": "concept:taixi",
       "type": "related_to",
@@ -60,28 +60,36 @@
       "weight": 57
     },
     {
-      "from": "person:auto-陶隱居",
-      "to": "person:taohongjing",
+      "from": "concept:auto-建齋",
+      "to": "ritual:zhaijiao",
       "type": "related_to",
       "source": "extract",
       "confidence": 0.55,
-      "weight": 21
+      "weight": 56
     },
     {
-      "from": "person:auto-陸先生",
-      "to": "person:luxiujing",
+      "from": "concept:auto-硫黃",
+      "to": "concept:huangya",
       "type": "related_to",
       "source": "extract",
       "confidence": 0.55,
-      "weight": 15
+      "weight": 52
     },
     {
-      "from": "person:auto-重陽祖師",
-      "to": "person:wangchongyang",
+      "from": "concept:auto-建齋",
+      "to": "ritual:huanglu",
       "type": "related_to",
       "source": "extract",
       "confidence": 0.55,
-      "weight": 6
+      "weight": 38
+    },
+    {
+      "from": "deity:auto-度仙上聖天尊",
+      "to": "deity:haosheng",
+      "type": "related_to",
+      "source": "extract",
+      "confidence": 0.55,
+      "weight": 28
     }
   ]
 }

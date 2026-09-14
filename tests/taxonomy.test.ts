@@ -20,6 +20,11 @@ const parents = [
   { id: 'concept:sanqing', type: 'concept', label: '三清' },
   { id: 'place:kunlun', type: 'place', label: '崑崙' },
   { id: 'place:taishan', type: 'place', label: '泰山' },
+  { id: 'place:nanyue', type: 'place', label: '南嶽', aliases: ['衡山', '南嶽衡山'] },
+  { id: 'place:xiyue', type: 'place', label: '西嶽', aliases: ['華山'] },
+  { id: 'deity:taiwei', type: 'deity', label: '太微帝君', aliases: ['太微'] },
+  { id: 'deity:nandou', type: 'deity', label: '南斗', aliases: ['南斗六司'] },
+  { id: 'concept:dansha', type: 'concept', label: '丹砂' },
 ];
 
 test('后缀正名：太上元始天尊 → 元始天尊', () => {
@@ -55,9 +60,10 @@ test('神名通名不挂三清：逍遙快樂天尊保持孤立', () => {
   assert.equal(inferTaxonomyLink({ term: '逍遙快樂天尊', type: 'deity' }, parents), null);
 });
 
-test('动词前缀丢弃：見老君、普告三界', () => {
+test('动词前缀丢弃：見老君、普告三界、傳太微天帝君', () => {
   assert.equal(inferTaxonomyLink({ term: '見老君', type: 'deity' }, parents), null);
   assert.equal(inferTaxonomyLink({ term: '普告三界', type: 'concept' }, parents), null);
+  assert.equal(inferTaxonomyLink({ term: '傳太微天帝君', type: 'deity' }, parents), null);
 });
 
 test('中央黃老君不误认为太上老君的下位', () => {
@@ -73,6 +79,13 @@ test('神祇中缀与安全别名：紫微、東嶽、雷祖大帝', () => {
 
 test('二字别名不作后缀：聞天尊不挂到任何正名', () => {
   assert.equal(inferTaxonomyLink({ term: '聞天尊', type: 'deity' }, parents), null);
+});
+
+test('太微前缀、南斗中缀、丹砂下位、衡山约定后缀', () => {
+  assert.equal(inferTaxonomyLink({ term: '太微天帝君', type: 'deity' }, parents)?.parentId, 'deity:taiwei');
+  assert.equal(inferTaxonomyLink({ term: '南斗六司星君', type: 'deity' }, parents)?.parentId, 'deity:nandou');
+  assert.equal(inferTaxonomyLink({ term: '伏火丹砂', type: 'concept' }, parents)?.parentId, 'concept:dansha');
+  assert.equal(inferTaxonomyLink({ term: '祝融衡山', type: 'place' }, parents)?.parentId, 'place:nanyue');
 });
 
 test('每个上位截断子女数量', () => {

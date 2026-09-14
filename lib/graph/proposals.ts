@@ -89,13 +89,36 @@ export function applyGraphProposals(
 const LEXICON = new Set(['concept', 'deity', 'person', 'place', 'ritual', 'sect']);
 
 /** 神名/科仪通名不参与「共享用字」判断，否则天尊之间全被当成相关 */
-const TITLE_AFFIX = /天尊|真君|大帝|帝君|夫人|元君|星君|真人|先生|[山嶽峰巖洞府宮觀]/;
+const TITLE_AFFIX = /天尊|真君|大帝|帝君|夫人|元君|星君|真人|先生|天師|祖師|隱居|法事|科儀|儀範|[山嶽峰巖洞府宮觀道場]/;
+
+function strippedLabel(label: string): string {
+  return label.replace(TITLE_AFFIX, '');
+}
 
 function sharesContentChar(a: string, b: string): boolean {
-  const x = a.replace(TITLE_AFFIX, '');
-  const y = b.replace(TITLE_AFFIX, '');
-  if (x.length < 1 || y.length < 1) return false;
+  const x = strippedLabel(a);
+  const y = strippedLabel(b);
+  if (x.length < 2 || y.length < 2) return false;
   return [...x].some(ch => y.includes(ch));
+}
+
+/** 去掉通名后同形或互相包含：陶隱居↔陶弘景、設醮儀↔醮壇 */
+function isNearAlias(a: string, b: string): boolean {
+  const x = strippedLabel(a);
+  const y = strippedLabel(b);
+  if (x.length < 1 || y.length < 1) return false;
+  if (x === y) return true;
+  if ((x.length >= 2 && y.includes(x)) || (y.length >= 2 && x.includes(y))) return true;
+  // 通名至少剥掉两字后剩一字（陶隱居→陶）：对侧以该字起头才认。
+  // 「三洞」只剥掉字符类里的「洞」剩「三」，不得因此挂到「三清」。
+  if (x.length === 1 && a.length - x.length >= 2 && y.startsWith(x)) return true;
+  if (y.length === 1 && b.length - y.length >= 2 && x.startsWith(y)) return true;
+  return false;
+}
+
+function typesCompatibleForExtract(a: string, b: string): boolean {
+  if (a === b && LEXICON.has(a)) return true;
+  return (a === 'ritual' && b === 'concept') || (a === 'concept' && b === 'ritual');
 }
 
 /**
@@ -121,25 +144,26 @@ export function extractRelationProposals(
     const a = nodeById.get(e.from);
     const b = nodeById.get(e.to);
     if (!a || !b) continue;
-    if (!LEXICON.has(a.type) || !LEXICON.has(b.type)) continue;
-    if (a.type !== b.type) continue;
+    if (!typesCompatibleForExtract(a.type, b.type)) continue;
     const origins = [a.origin, b.origin];
     if (!origins.includes('curated') || !origins.includes('auto')) continue;
     const curated = a.origin === 'curated' ? a : b;
-    // 無為/長生等广布概念与几乎所有术语共现，提成 related_to 会污染「相关概念」
-    if ((curated.works ?? 0) > 420) continue;
-    if (!sharesContentChar(a.label, b.label)) continue;
+    const near = isNearAlias(a.label, b.label);
+    const share = sharesContentChar(a.label, b.label);
+    if (!near && !share) continue;
+    // 广布概念的「共享用字」边会污染相关概念；近义别名凭词形，可放宽
+    if (!near && (curated.works ?? 0) > 420) continue;
     if (hard.has(`${a.id}|${b.id}`)) continue;
     const w = e.weight ?? 0;
-    if (w < 4) continue;
+    if (w < (near ? 2 : 4)) continue;
     scored.push({
       from: a.origin === 'auto' ? a.id : b.id,
       to: a.origin === 'curated' ? a.id : b.id,
       type: 'related_to',
       source: 'extract',
-      confidence: 0.55,
+      confidence: near ? 0.62 : 0.55,
       weight: w,
-      w,
+      w: near ? w + 1000 : w,
     });
   }
   scored.sort((x, y) => y.w - x.w || x.from.localeCompare(y.from));

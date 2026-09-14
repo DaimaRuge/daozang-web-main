@@ -72,3 +72,34 @@ test('抽取：只收策展↔自动的强共现，且已有构词边的跳过',
   assert.equal(proposals[0].to, 'deity:ziwei');
   assert.equal(proposals[0].source, 'extract');
 });
+
+test('抽取：三洞不得因剥掉「洞」而挂到三清', () => {
+  const g = graph(
+    [{ from: 'concept:auto-sandong', to: 'concept:sanqing', type: 'cooccurs_with', source: 'cooccur', confidence: 0.5, weight: 200 }],
+    [
+      { id: 'concept:auto-sandong', type: 'concept', label: '三洞', origin: 'auto', works: 291 },
+      { id: 'concept:sanqing', type: 'concept', label: '三清', origin: 'curated', works: 100 },
+    ],
+  );
+  assert.equal(extractRelationProposals(g, 10).length, 0);
+});
+
+test('抽取：近义别名置信度更高；科仪可连概念', () => {
+  const g = graph(
+    [
+      { from: 'person:auto-yin', to: 'person:taohongjing', type: 'cooccurs_with', source: 'cooccur', confidence: 0.5, weight: 3 },
+      { from: 'ritual:auto-jiao', to: 'concept:jiaotan', type: 'cooccurs_with', source: 'cooccur', confidence: 0.5, weight: 8 },
+    ],
+    [
+      { id: 'person:auto-yin', type: 'person', label: '陶隱居', origin: 'auto', works: 20 },
+      { id: 'person:taohongjing', type: 'person', label: '陶弘景', origin: 'curated', works: 40 },
+      { id: 'ritual:auto-jiao', type: 'ritual', label: '設醮儀', origin: 'auto', works: 10 },
+      { id: 'concept:jiaotan', type: 'concept', label: '醮壇', origin: 'curated', works: 80 },
+    ],
+  );
+  const proposals = extractRelationProposals(g, 10);
+  assert.equal(proposals.length, 2);
+  const yin = proposals.find(p => p.from === 'person:auto-yin');
+  assert.ok(yin && yin.confidence > 0.55);
+  assert.equal(proposals.find(p => p.from === 'ritual:auto-jiao')?.to, 'concept:jiaotan');
+});
