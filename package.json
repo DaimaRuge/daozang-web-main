@@ -21,7 +21,9 @@
     "generate:importmap": "payload generate:importmap",
     "generate:types": "payload generate:types",
     "import-sqlite": "tsx scripts/import-sqlite.ts",
-    "upload-media": "tsx scripts/upload-media.ts"
+    "upload-media": "tsx scripts/upload-media.ts",
+    "upload:daozang-scans": "tsx scripts/upload-daozang-scans.ts",
+    "publish:daozang-web-images": "tsx scripts/publish-daozang-web-images.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1108.0",
@@ -30,6 +32,7 @@
     "@payloadcms/db-postgres": "^3.88.0",
     "@payloadcms/next": "^3.88.0",
     "@payloadcms/richtext-lexical": "^3.88.0",
+    "@vercel/blob": "^2.8.0",
     "bcryptjs": "^3.0.3",
     "graphql": "^16.14.2",
     "next": "16.3.0",
